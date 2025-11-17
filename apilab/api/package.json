@@ -8,6 +8,7 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.22.0",
     "e2b": "^2.7.0"
   },
   "devDependencies": {

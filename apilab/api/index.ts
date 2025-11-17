@@ -5,14 +5,21 @@
 
 import { createServer } from 'node:http';
 import Sandbox from 'e2b';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamable-http.js';
 
 const PORT = process.env.PORT || 3001;
 
 // In-memory cache for sandboxes (in production, use Redis/DB)
-const sandboxCache = new Map<string, any>();
+const sandboxCache = new Map<string, {
+  sandbox: any;
+  mcpClient: Client;
+  mcpUrl: string;
+  mcpToken: string;
+}>();
 
 /**
- * Create E2B sandbox with MCP gateway
+ * Create E2B sandbox with MCP gateway and connect MCP client
  * Using official E2B API: https://e2b.dev/docs/mcp
  */
 async function createMcpSandbox(apiKey: string, mcpServers: Record<string, any>) {
@@ -33,14 +40,37 @@ async function createMcpSandbox(apiKey: string, mcpServers: Record<string, any>)
   console.log('✅ Sandbox created successfully!');
   console.log('🔗 MCP URL:', mcpUrl);
 
-  // Cache the sandbox
+  // Connect MCP client (backend proxies all MCP operations)
+  console.log('🔌 Connecting MCP client from backend...');
+  const mcpClient = new Client({
+    name: 'apilab-backend',
+    version: '1.0.0'
+  });
+
+  const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
+    requestInit: {
+      headers: {
+        'Authorization': `Bearer ${mcpToken}`
+      }
+    }
+  });
+
+  await mcpClient.connect(transport);
+  console.log('✅ MCP client connected!');
+
+  // Cache everything
   const sandboxId = (sandbox as any).id || Date.now().toString();
-  sandboxCache.set(sandboxId, sandbox);
+  sandboxCache.set(sandboxId, {
+    sandbox,
+    mcpClient,
+    mcpUrl,
+    mcpToken
+  });
 
   return {
     sandboxId,
-    mcpUrl,
-    mcpToken,
+    mcpUrl, // Still return for reference (but frontend won't use it directly)
+    mcpToken, // Still return for reference
   };
 }
 
@@ -136,20 +166,89 @@ const server = createServer(async (req, res) => {
   // Get sandbox info
   if (url.pathname.startsWith('/api/mcp/sandbox/') && req.method === 'GET') {
     const sandboxId = url.pathname.split('/').pop();
-    const sandbox = sandboxCache.get(sandboxId || '');
+    const cached = sandboxCache.get(sandboxId || '');
 
-    if (!sandbox) {
+    if (!cached) {
       sendJSON(res, { error: 'Sandbox not found' }, 404);
       return;
     }
 
-    const isRunning = (await sandbox.isRunning?.()) || false;
+    const isRunning = (await cached.sandbox.isRunning?.()) || false;
 
     sendJSON(res, {
       sandboxId,
       isRunning,
-      url: sandbox.getMcpUrl?.(),
+      url: cached.mcpUrl,
     });
+    return;
+  }
+
+  // List MCP tools (PROXY)
+  if (url.pathname.startsWith('/api/mcp/tools/') && req.method === 'GET') {
+    const sandboxId = url.pathname.split('/').pop();
+    const cached = sandboxCache.get(sandboxId || '');
+
+    if (!cached) {
+      sendJSON(res, { error: 'Sandbox not found' }, 404);
+      return;
+    }
+
+    try {
+      console.log('📋 Listing MCP tools for sandbox:', sandboxId);
+      const toolsList = await cached.mcpClient.listTools();
+      console.log(`✅ Found ${toolsList.tools.length} tools`);
+
+      sendJSON(res, {
+        tools: toolsList.tools,
+        count: toolsList.tools.length
+      });
+    } catch (error: any) {
+      console.error('❌ Failed to list tools:', error);
+      sendJSON(res, {
+        error: error.message || 'Failed to list MCP tools',
+        details: error.stack
+      }, 500);
+    }
+    return;
+  }
+
+  // Call MCP tool (PROXY)
+  if (url.pathname.startsWith('/api/mcp/call/') && req.method === 'POST') {
+    const sandboxId = url.pathname.split('/').pop();
+    const cached = sandboxCache.get(sandboxId || '');
+
+    if (!cached) {
+      sendJSON(res, { error: 'Sandbox not found' }, 404);
+      return;
+    }
+
+    try {
+      const body = await parseBody(req);
+      const { toolName, args } = body;
+
+      if (!toolName) {
+        sendJSON(res, { error: 'toolName is required' }, 400);
+        return;
+      }
+
+      console.log(`🔧 Calling tool: ${toolName}`, args);
+      const result = await cached.mcpClient.callTool({
+        name: toolName,
+        arguments: args || {}
+      });
+      console.log('✅ Tool call successful');
+
+      sendJSON(res, {
+        result: result.content,
+        isError: result.isError || false
+      });
+    } catch (error: any) {
+      console.error('❌ Failed to call tool:', error);
+      sendJSON(res, {
+        error: error.message || 'Failed to call MCP tool',
+        details: error.stack
+      }, 500);
+    }
     return;
   }
 
@@ -160,12 +259,17 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log('');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('🚀 APILab Backend Server (Node.js)');
+  console.log('🚀 APILab Backend Server (MCP Proxy Mode)');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('');
-  console.log(`📍 Server running at: http://localhost:${PORT}`);
-  console.log(`🔍 Health check:      http://localhost:${PORT}/health`);
-  console.log(`🌐 MCP Init endpoint: http://localhost:${PORT}/api/mcp/init`);
+  console.log(`📍 Server:      http://localhost:${PORT}`);
+  console.log(`🔍 Health:      http://localhost:${PORT}/health`);
+  console.log('');
+  console.log('🔌 MCP Endpoints:');
+  console.log(`   POST /api/mcp/init                - Create sandbox`);
+  console.log(`   GET  /api/mcp/tools/:sandboxId    - List tools`);
+  console.log(`   POST /api/mcp/call/:sandboxId     - Call tool`);
+  console.log(`   GET  /api/mcp/sandbox/:sandboxId  - Get info`);
   console.log('');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('');

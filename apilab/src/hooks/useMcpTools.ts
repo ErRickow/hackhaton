@@ -1,11 +1,9 @@
 /**
  * useMcpTools Hook
- * Manages E2B MCP connection via backend API (Option 4: Full Browser SSE Client)
+ * Manages E2B MCP connection via BACKEND PROXY (no direct E2B connection)
  */
 
 import { useState, useEffect } from 'react';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { UseMcpToolsReturn } from '@/types';
 import { z } from 'zod';
 
@@ -15,46 +13,6 @@ export function useMcpTools(): UseMcpToolsReturn {
   const [isStarting, setIsStarting] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-
-  /**
-   * Wait for MCP gateway to be ready by polling the URL
-   */
-  async function waitForServerReady(url: string, token: string, maxAttempts = 10): Promise<boolean> {
-    console.log(`🔍 Testing MCP gateway readiness at: ${url}`);
-    console.log(`⏱️  Will try ${maxAttempts} times with 5 second delays`);
-
-    for (let i = 0; i < maxAttempts; i++) {
-      try {
-        console.log(`\n📡 Attempt ${i + 1}/${maxAttempts}: Fetching ${url}...`);
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        console.log(`📥 Response status: ${response.status} ${response.statusText}`);
-
-        if (response.ok) {
-          console.log(`✅ MCP gateway ready!`);
-          return true;
-        }
-
-        console.log(`⏳ Gateway not ready yet (attempt ${i + 1}/${maxAttempts})`);
-      } catch (err) {
-        console.log(`⏳ Gateway connection failed (attempt ${i + 1}/${maxAttempts}):`);
-        console.error(err);
-      }
-
-      if (i < maxAttempts - 1) {
-        console.log(`⌛ Waiting 5 seconds before next attempt...`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
-      }
-    }
-    console.log(`\n❌ Gateway failed to become ready after ${maxAttempts} attempts`);
-    return false;
-  }
 
   /**
    * Convert MCP SDK tools to AI SDK format
@@ -70,8 +28,7 @@ export function useMcpTools(): UseMcpToolsReturn {
         description: tool.description || '',
         parameters,
         execute: async (args: any) => {
-          // This will be called by AI SDK when tool is invoked
-          // We return a placeholder - actual execution happens via MCP protocol
+          // Placeholder - actual execution happens via backend API
           return { success: true, args };
         }
       };
@@ -98,9 +55,6 @@ export function useMcpTools(): UseMcpToolsReturn {
       switch (value.type) {
         case 'string':
           zodType = z.string();
-          if (value.description) {
-            zodType = zodType.describe(value.description);
-          }
           break;
         case 'number':
           zodType = z.number();
@@ -124,27 +78,23 @@ export function useMcpTools(): UseMcpToolsReturn {
     return z.object(shape);
   }
 
+  /**
+   * Start MCP connection via backend proxy
+   * Backend handles all E2B communication
+   */
   const startHttpClient = async () => {
-    if (isStarting || isReady) return;
-
     setIsStarting(true);
     setError(null);
+    setIsReady(false);
+
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🚀 Starting MCP Connection via Backend Proxy');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
     try {
-      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('🚀 Starting E2B MCP via Backend API (Option 4)');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-      console.log('⏱️  This may take 30-60 seconds for first boot...\n');
-
-      // Get E2B API key and backend URL from localStorage
-      const stored = window.localStorage.getItem('apilab_api_keys');
-      const apiKeys = stored ? JSON.parse(stored) : {};
-      const apiKey = apiKeys.e2b;
-      const backendUrl = apiKeys.backendUrl || import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-      console.log('🔑 Checking API keys...');
-      console.log(`   E2B API key: ${apiKey ? '✅ Found (length: ' + apiKey.length + ')' : '❌ Not found'}`);
-      console.log(`   Backend URL: ${backendUrl ? '✅ ' + backendUrl : '❌ Not configured'}`);
+      // Get config from localStorage
+      const apiKey = localStorage.getItem('e2bApiKey');
+      const backendUrl = localStorage.getItem('backendUrl');
 
       if (!apiKey) {
         throw new Error('E2B API key not found. Please configure it in Settings.');
@@ -154,9 +104,9 @@ export function useMcpTools(): UseMcpToolsReturn {
         throw new Error('Backend URL not configured. Please configure it in Settings.');
       }
 
-      // Call backend API to create MCP sandbox
-      console.log('\n📡 Step 1: Calling backend API to create E2B sandbox...');
-      console.log(`   API URL: ${backendUrl}/api/mcp/init`);
+      // Step 1: Call backend to create E2B sandbox
+      console.log('📡 Step 1: Creating E2B sandbox via backend...');
+      console.log(`   Backend: ${backendUrl}/api/mcp/init`);
 
       const initResponse = await fetch(`${backendUrl}/api/mcp/init`, {
         method: 'POST',
@@ -181,7 +131,6 @@ export function useMcpTools(): UseMcpToolsReturn {
           errorData = { error: errorText };
         }
 
-        // Create error with all debug info attached
         const error = new Error(`Backend API error (${initResponse.status}): ${errorData.error || initResponse.statusText}`) as any;
         error.status = initResponse.status;
         error.statusText = initResponse.statusText;
@@ -193,71 +142,68 @@ export function useMcpTools(): UseMcpToolsReturn {
         throw error;
       }
 
-      const { sandboxId, mcpUrl, mcpToken } = await initResponse.json();
+      const { sandboxId } = await initResponse.json();
 
-      console.log('✅ Backend API returned sandbox info!');
-      console.log(`   Sandbox ID: ${sandboxId}`);
-      console.log(`   MCP URL: ${mcpUrl}`);
-      console.log(`   Token: ${mcpToken ? '✅ Obtained' : '❌ Missing'}\n`);
+      console.log('✅ Backend created sandbox!');
+      console.log(`   Sandbox ID: ${sandboxId}\n`);
 
-      // Wait for gateway to be ready
-      console.log('📡 Step 2: Waiting for MCP gateway to be ready...');
-      const isGatewayReady = await waitForServerReady(mcpUrl, mcpToken, 10);
+      // Step 2: Fetch tools from backend proxy (backend handles MCP connection)
+      console.log('🔧 Step 2: Fetching tools via backend proxy...');
+      console.log(`   Backend: ${backendUrl}/api/mcp/tools/${sandboxId}`);
 
-      if (!isGatewayReady) {
-        const error = new Error('MCP gateway failed to start within timeout period') as any;
-        error.mcpUrl = mcpUrl;
-        error.attempts = 10;
-        error.timeoutSeconds = 50; // 10 attempts * 5 seconds
-        throw error;
-      }
-
-      // Create MCP client with authentication (BROWSER-COMPATIBLE!)
-      console.log('\n🔌 Step 3: Creating MCP client (browser-compatible)...');
-      const client = new Client({
-        name: 'apilab-mcp-client',
-        version: '1.0.0'
-      });
-
-      const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
-        requestInit: {
-          headers: {
-            'Authorization': `Bearer ${mcpToken}`
-          }
+      const toolsResponse = await fetch(`${backendUrl}/api/mcp/tools/${sandboxId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
         }
       });
 
-      await client.connect(transport);
-      console.log('✅ MCP client connected!\n');
+      if (!toolsResponse.ok) {
+        const errorText = await toolsResponse.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
 
-      // List available tools
-      console.log('🔧 Step 4: Fetching available tools from MCP gateway...');
-      const toolsList = await client.listTools();
+        const error = new Error(`Backend tools error (${toolsResponse.status}): ${errorData.error || toolsResponse.statusText}`) as any;
+        error.status = toolsResponse.status;
+        error.statusText = toolsResponse.statusText;
+        error.url = `${backendUrl}/api/mcp/tools/${sandboxId}`;
+        error.responseBody = errorData;
+        error.rawResponse = errorText;
+
+        console.error('❌ Backend Tools Error:', error);
+        throw error;
+      }
+
+      const { tools: mcpTools } = await toolsResponse.json();
 
       console.log('\n✅ Tools loaded successfully!');
-      console.log(`📊 Total tools: ${toolsList.tools.length}`);
+      console.log(`📊 Total tools: ${mcpTools.length}`);
       console.log('📋 Available tools:');
-      toolsList.tools.forEach((tool: any) => {
+      mcpTools.forEach((tool: any) => {
         console.log(`   - ${tool.name}: ${tool.description || 'No description'}`);
       });
 
       // Convert MCP tools to AI SDK format
-      console.log('\n🔄 Step 5: Converting tools to AI SDK format...');
-      const aiSdkTools = convertMcpToolsToAiSdk(toolsList.tools);
+      console.log('\n🔄 Step 3: Converting tools to AI SDK format...');
+      const aiSdkTools = convertMcpToolsToAiSdk(mcpTools);
       console.log(`✅ Converted ${Object.keys(aiSdkTools).length} tools to AI SDK format\n`);
 
-      // Store everything
-      setMcpServer({ sandboxId, mcpUrl, mcpToken, client });
+      // Store everything (no MCP client - backend handles it)
+      setMcpServer({ sandboxId, backendUrl });
       setTools(aiSdkTools);
       setIsReady(true);
       setIsStarting(false);
 
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('✅ MCP Gateway Ready!');
+      console.log('✅ MCP Ready via Backend Proxy!');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     } catch (err) {
       console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.error('❌ MCP Gateway Initialization Failed');
+      console.error('❌ MCP Initialization Failed');
       console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
       console.error('Error details:', err);
 
@@ -270,32 +216,66 @@ export function useMcpTools(): UseMcpToolsReturn {
         error.originalError = err;
       }
 
-      // Ensure all custom properties are preserved
       setError(error);
       setIsStarting(false);
       setIsReady(false);
 
-      // Make sure error is visible
       console.error('🔴 FULL ERROR OBJECT:', error);
     }
   };
 
+  /**
+   * Call MCP tool via backend proxy
+   */
   const callTool = async (toolName: string, args: Record<string, any>) => {
+    if (!mcpServer || !mcpServer.sandboxId) {
+      throw new Error('MCP server not initialized');
+    }
+
     if (!tools || Object.keys(tools).length === 0) {
       throw new Error('MCP tools not initialized');
     }
 
     try {
-      console.log(`🔧 Calling MCP tool: ${toolName}`, args);
+      console.log(`🔧 Calling MCP tool via backend: ${toolName}`, args);
 
-      const tool = tools[toolName];
+      const { sandboxId, backendUrl } = mcpServer;
 
-      if (!tool) {
-        throw new Error(`Tool ${toolName} not found. Available: ${Object.keys(tools).join(', ')}`);
+      // Call backend proxy to execute tool
+      const response = await fetch(`${backendUrl}/api/mcp/call/${sandboxId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          toolName,
+          args
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+
+        const error = new Error(`Backend tool call error (${response.status}): ${errorData.error || response.statusText}`) as any;
+        error.status = response.status;
+        error.statusText = response.statusText;
+        error.url = `${backendUrl}/api/mcp/call/${sandboxId}`;
+        error.toolName = toolName;
+        error.args = args;
+        error.responseBody = errorData;
+        error.rawResponse = errorText;
+
+        console.error('❌ Backend Tool Call Error:', error);
+        throw error;
       }
 
-      // Execute the tool
-      const result = await tool.execute?.(args);
+      const result = await response.json();
       console.log('✓ MCP tool result:', result);
 
       return result;
