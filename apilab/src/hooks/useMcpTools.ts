@@ -9,9 +9,6 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type { UseMcpToolsReturn } from '@/types';
 import { z } from 'zod';
 
-// Backend API URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
 export function useMcpTools(): UseMcpToolsReturn {
   const [mcpServer, setMcpServer] = useState<any>(null);
   const [tools, setTools] = useState<any>({}); // Store AI SDK tools format
@@ -139,23 +136,29 @@ export function useMcpTools(): UseMcpToolsReturn {
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
       console.log('⏱️  This may take 30-60 seconds for first boot...\n');
 
-      // Get E2B API key from localStorage
+      // Get E2B API key and backend URL from localStorage
       const stored = window.localStorage.getItem('apilab_api_keys');
       const apiKeys = stored ? JSON.parse(stored) : {};
       const apiKey = apiKeys.e2b;
+      const backendUrl = apiKeys.backendUrl || import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
       console.log('🔑 Checking API keys...');
       console.log(`   E2B API key: ${apiKey ? '✅ Found (length: ' + apiKey.length + ')' : '❌ Not found'}`);
+      console.log(`   Backend URL: ${backendUrl ? '✅ ' + backendUrl : '❌ Not configured'}`);
 
       if (!apiKey) {
         throw new Error('E2B API key not found. Please configure it in Settings.');
       }
 
+      if (!backendUrl) {
+        throw new Error('Backend URL not configured. Please configure it in Settings.');
+      }
+
       // Call backend API to create MCP sandbox
       console.log('\n📡 Step 1: Calling backend API to create E2B sandbox...');
-      console.log(`   API URL: ${API_BASE_URL}/api/mcp/init`);
+      console.log(`   API URL: ${backendUrl}/api/mcp/init`);
 
-      const initResponse = await fetch(`${API_BASE_URL}/api/mcp/init`, {
+      const initResponse = await fetch(`${backendUrl}/api/mcp/init`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

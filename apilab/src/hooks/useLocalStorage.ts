@@ -36,6 +36,7 @@ export interface ApiKeys {
   e2b: string;
   neosantara: string;
   groq: string;
+  backendUrl: string;
 }
 
 /**
@@ -46,6 +47,7 @@ export function useApiKeys() {
     e2b: '',
     neosantara: '',
     groq: '',
+    backendUrl: import.meta.env.VITE_API_URL || 'http://localhost:3001',
   });
 
   const updateKey = (provider: keyof ApiKeys, value: string) => {

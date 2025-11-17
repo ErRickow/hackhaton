@@ -16,7 +16,7 @@ interface SettingsProps {
   onClose: () => void;
 }
 
-type Provider = 'e2b' | 'neosantara' | 'groq';
+type Provider = 'e2b' | 'neosantara' | 'groq' | 'backendUrl';
 
 interface ProviderInfo {
   name: string;
@@ -27,6 +27,13 @@ interface ProviderInfo {
 }
 
 const PROVIDERS: Record<Provider, ProviderInfo> = {
+  backendUrl: {
+    name: 'Backend API URL',
+    description: 'APILab backend server URL (local or Cloudflare Worker)',
+    placeholder: 'http://localhost:3001',
+    url: 'https://developers.cloudflare.com/workers',
+    required: true,
+  },
   e2b: {
     name: 'E2B Sandbox',
     description: 'Required for running MCP servers in browser',
@@ -134,6 +141,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                 }}
                 className="w-full px-3 py-2 border-2 rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
+                <option value="backendUrl">Backend API URL (Required)</option>
                 <option value="e2b">E2B Sandbox (Required)</option>
                 <option value="neosantara">Neosantara AI (Primary LLM)</option>
                 <option value="groq">Groq (Alternative LLM)</option>
@@ -145,10 +153,10 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
 
             {/* API Key Input */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">API Key</label>
+              <label className="text-sm font-medium">{selectedProvider === 'backendUrl' ? 'URL' : 'API Key'}</label>
               <div className="flex gap-2">
                 <Input
-                  type={showKeys ? 'text' : 'password'}
+                  type={selectedProvider === 'backendUrl' ? 'url' : (showKeys ? 'text' : 'password')}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   placeholder={currentProviderInfo.placeholder}
@@ -159,14 +167,16 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                     }
                   }}
                 />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setShowKeys(!showKeys)}
-                  title={showKeys ? 'Hide' : 'Show'}
-                >
-                  {showKeys ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
+                {selectedProvider !== 'backendUrl' && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowKeys(!showKeys)}
+                    title={showKeys ? 'Hide' : 'Show'}
+                  >
+                    {showKeys ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 Get your key from:{' '}
@@ -195,6 +205,38 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
           {/* Current Keys Status */}
           <div className="space-y-3">
             <h3 className="font-semibold text-sm">Configured API Keys</h3>
+
+            {/* Backend URL Status */}
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <div>
+                  <p className="font-medium text-sm">Backend API URL</p>
+                  <p className="text-xs text-muted-foreground">Required</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {apiKeys.backendUrl ? (
+                  <>
+                    <Badge variant="default" className="bg-green-500">
+                      <Check className="h-3 w-3 mr-1" />
+                      {apiKeys.backendUrl}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete('backendUrl')}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+                    Not Configured
+                  </Badge>
+                )}
+              </div>
+            </div>
 
             {/* E2B Status */}
             <div className="flex items-center justify-between p-3 border rounded-lg">
