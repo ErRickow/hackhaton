@@ -3,13 +3,23 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Beaker, Send, Loader2, AlertCircle } from 'lucide-react'
 import { ChatMessage } from '@/components/ChatMessage'
+import { WebhookMonitor } from '@/components/WebhookMonitor'
 import { useApiChat } from '@/hooks/useApiChat'
 import { useMcpTools } from '@/hooks/useMcpTools'
+import { useWebhooks } from '@/hooks/useWebhooks'
 import { useRef, useEffect } from 'react'
 
 function App() {
   const { messages, input, isLoading, error, handleInputChange, handleSubmit } = useApiChat()
   const { isStarting, isReady, error: mcpError } = useMcpTools()
+  const {
+    webhookUrl,
+    events: webhookEvents,
+    isStarting: webhookStarting,
+    isReady: webhookReady,
+    refreshEvents,
+    clearEvents,
+  } = useWebhooks()
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when new messages arrive
@@ -40,7 +50,19 @@ function App() {
               {isReady && (
                 <>
                   <div className="h-2 w-2 rounded-full bg-green-500" />
-                  <span className="text-muted-foreground">Ready</span>
+                  <span className="text-muted-foreground">API Ready</span>
+                </>
+              )}
+              {webhookStarting && (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                  <span className="text-muted-foreground">Starting Webhook...</span>
+                </>
+              )}
+              {webhookReady && (
+                <>
+                  <div className="h-2 w-2 rounded-full bg-blue-500" />
+                  <span className="text-muted-foreground">Webhook Ready</span>
                 </>
               )}
             </div>
@@ -192,6 +214,17 @@ function App() {
               </form>
             </CardContent>
           </Card>
+
+          {/* Webhook Monitor */}
+          <div className="mt-8">
+            <WebhookMonitor
+              webhookUrl={webhookUrl || undefined}
+              events={webhookEvents}
+              onRefresh={refreshEvents}
+              onClear={clearEvents}
+              isLoading={webhookStarting}
+            />
+          </div>
         </div>
       </main>
 
