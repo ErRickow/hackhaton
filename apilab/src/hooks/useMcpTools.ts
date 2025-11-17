@@ -1,14 +1,17 @@
 /**
  * useMcpTools Hook
- * Manages E2B sandbox and MCP server lifecycle
+ * Manages E2B sandbox, MCP server lifecycle, and MCP client
  */
 
 import { useState, useEffect } from 'react';
 import { startMcpSandbox } from '@netglade/mcp-sandbox';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import type { UseMcpToolsReturn, McpTool, McpServer } from '@/types';
 
 export function useMcpTools(): UseMcpToolsReturn {
   const [mcpServer, setMcpServer] = useState<McpServer | null>(null);
+  const [mcpClient, setMcpClient] = useState<Client | null>(null);
   const [tools, setTools] = useState<McpTool[]>([]);
   const [isStarting, setIsStarting] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -34,22 +37,51 @@ export function useMcpTools(): UseMcpToolsReturn {
 
       // Start the MCP server in E2B sandbox
       // Using @sylphlab/tools-fetch-mcp for HTTP requests
-      const mcp = await startMcpSandbox({
+      const mcpSandbox = await startMcpSandbox({
         command: 'npx -y @sylphlab/tools-fetch-mcp',
         apiKey,
       });
 
-      console.log('✓ MCP server started');
-      console.log('  URL:', mcp.getUrl());
+      console.log('✓ MCP sandbox started');
+      const serverUrl = mcpSandbox.getUrl();
+      console.log('  URL:', serverUrl);
+
+      // Create MCP client with SSE transport
+      const client = new Client(
+        {
+          name: 'apilab-mcp-client',
+          version: '1.0.0',
+        },
+        {
+          capabilities: {},
+        }
+      );
+
+      // Connect to MCP server via SSE
+      const transport = new SSEClientTransport(new URL(serverUrl));
+      await client.connect(transport);
+      console.log('✓ MCP client connected');
 
       // Get available tools from the MCP server
       let availableTools: McpTool[] = [];
       try {
-        availableTools = await (mcp as any).listTools();
+        const toolsResponse = await client.listTools();
+        console.log('✓ Raw tools response:', toolsResponse);
+
+        // Convert MCP tools to our format
+        availableTools = toolsResponse.tools.map((tool: any) => ({
+          name: tool.name,
+          description: tool.description || '',
+          inputSchema: tool.inputSchema || {
+            type: 'object',
+            properties: {},
+          },
+        }));
+
         console.log('✓ Tools loaded from MCP server:', availableTools.length);
         console.log('  Available tools:', availableTools.map(t => t.name).join(', '));
-      } catch (error) {
-        console.warn('Could not load tools from MCP server, using defaults:', error);
+      } catch (err) {
+        console.warn('Could not load tools from MCP server, using defaults:', err);
         // Fallback tools based on typical fetch-mcp capabilities
         availableTools = [
           {
@@ -83,7 +115,8 @@ export function useMcpTools(): UseMcpToolsReturn {
       }
       console.log('✓ Tools ready:', availableTools.length);
 
-      setMcpServer(mcp as any);
+      setMcpServer(mcpSandbox as any);
+      setMcpClient(client);
       setTools(availableTools);
       setIsReady(true);
       setIsStarting(false);
@@ -98,18 +131,38 @@ export function useMcpTools(): UseMcpToolsReturn {
   };
 
   const callTool = async (toolName: string, args: Record<string, any>) => {
-    if (!mcpServer) {
-      throw new Error('MCP server not initialized');
+    if (!mcpClient) {
+      throw new Error('MCP client not initialized');
     }
 
     try {
       console.log(`🔧 Calling MCP tool: ${toolName}`, args);
 
-      // Call the tool through the MCP server
-      // The MCP server should have a callTool method
-      const result = await (mcpServer as any).callTool(toolName, args);
+      // Call the tool through the MCP client
+      const result = await mcpClient.callTool({
+        name: toolName,
+        arguments: args,
+      });
 
       console.log('✓ MCP tool result:', result);
+
+      // Extract content from MCP response
+      if (result.content && Array.isArray(result.content)) {
+        // MCP returns content as array of content items
+        const textContent = result.content
+          .filter((item: any) => item.type === 'text')
+          .map((item: any) => item.text)
+          .join('\n');
+
+        try {
+          // Try to parse as JSON if it looks like JSON
+          return JSON.parse(textContent);
+        } catch {
+          // Return as-is if not JSON
+          return textContent;
+        }
+      }
+
       return result;
     } catch (error) {
       console.error('❌ MCP tool call failed:', error);
