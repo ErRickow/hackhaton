@@ -6,7 +6,7 @@
 import { createServer } from 'node:http';
 import Sandbox from 'e2b';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamable-http.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
 const PORT = process.env.PORT || 3001;
 
