@@ -173,8 +173,20 @@ export function useMcpTools(): UseMcpToolsReturn {
       });
 
       if (!initResponse.ok) {
-        const errorData = await initResponse.json();
-        throw new Error(`Backend API error: ${errorData.error || initResponse.statusText}`);
+        const errorText = await initResponse.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+        console.error('❌ Backend API Error:', {
+          status: initResponse.status,
+          statusText: initResponse.statusText,
+          error: errorData,
+          url: `${backendUrl}/api/mcp/init`
+        });
+        throw new Error(`Backend API error (${initResponse.status}): ${errorData.error || initResponse.statusText}`);
       }
 
       const { sandboxId, mcpUrl, mcpToken } = await initResponse.json();
@@ -244,9 +256,14 @@ export function useMcpTools(): UseMcpToolsReturn {
         message: err instanceof Error ? err.message : String(err),
         stack: err instanceof Error ? err.stack : undefined,
       });
-      setError(err instanceof Error ? err : new Error(String(err)));
+
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
       setIsStarting(false);
       setIsReady(false);
+
+      // Make sure error is visible
+      console.error('🔴 ERROR OBJECT:', error);
     }
   };
 
