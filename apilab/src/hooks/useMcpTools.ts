@@ -67,11 +67,13 @@ export function useMcpTools(): UseMcpToolsReturn {
 
       // Start the MCP server in E2B sandbox (NetGlade pattern)
       console.log('📦 Starting E2B sandbox...');
-      console.log('🔧 Using fetch-mcp (Node.js based MCP server for HTTP requests)');
+      console.log('🔧 Using @modelcontextprotocol/server-brave-search (proven NetGlade winner package)');
       const mcpSandbox = await startMcpSandbox({
-        command: 'npx -y fetch-mcp',
+        command: 'npx -y @modelcontextprotocol/server-brave-search',
         apiKey,
-        envs: {},
+        envs: {
+          BRAVE_API_KEY: apiKeys.brave || '', // Optional: Brave API key for enhanced search
+        },
         timeoutMs: 1000 * 60 * 5, // 5 minutes like NetGlade
       });
 
