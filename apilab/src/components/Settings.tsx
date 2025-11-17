@@ -36,9 +36,9 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <CardHeader>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 shadow-2xl">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <SettingsIcon className="h-5 w-5" />
@@ -52,7 +52,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
             Configure your API keys. All keys are stored locally in your browser.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 bg-white dark:bg-gray-900 p-6">
           {/* E2B API Key */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -77,7 +77,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
               value={tempKeys.e2b}
               onChange={(e) => setTempKeys({ ...tempKeys, e2b: e.target.value })}
               placeholder="e2b_..."
-              className="font-mono text-sm"
+              className="font-mono text-sm bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400"
             />
             <p className="text-xs text-muted-foreground">
               Get your key from:{' '}
@@ -114,7 +114,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
               value={tempKeys.neosantara}
               onChange={(e) => setTempKeys({ ...tempKeys, neosantara: e.target.value })}
               placeholder="nsk_..."
-              className="font-mono text-sm"
+              className="font-mono text-sm bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400"
             />
             <p className="text-xs text-muted-foreground">
               Indonesian language model with function calling support
@@ -153,7 +153,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
               value={tempKeys.groq}
               onChange={(e) => setTempKeys({ ...tempKeys, groq: e.target.value })}
               placeholder="gsk_..."
-              className="font-mono text-sm"
+              className="font-mono text-sm bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400"
             />
             <p className="text-xs text-muted-foreground">
               Fast inference with llama-3.1-8b-instant
@@ -171,7 +171,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
           </div>
 
           {/* Show/Hide Keys Toggle */}
-          <div className="flex items-center justify-between pt-4 border-t">
+          <div className="flex items-center justify-between pt-4 border-t-2 border-gray-200 dark:border-gray-700">
             <Button
               variant="outline"
               size="sm"
@@ -202,8 +202,8 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
 
           {/* Warning */}
           {(!hasE2bKey || !hasLLMKey) && (
-            <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+            <div className="p-4 bg-yellow-100 dark:bg-yellow-900/50 border-2 border-yellow-400 dark:border-yellow-600 rounded-lg">
+              <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
                 ⚠️ <strong>Required:</strong> You need at least E2B API key and one LLM provider (Neosantara or Groq) to use APILab.
               </p>
             </div>
