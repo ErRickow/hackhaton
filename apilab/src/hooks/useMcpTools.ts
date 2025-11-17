@@ -21,20 +21,28 @@ export function useMcpTools(): UseMcpToolsReturn {
    * NetGlade pattern: retry up to maxAttempts with 6s delay
    */
   async function waitForServerReady(url: string, maxAttempts = 5): Promise<boolean> {
+    console.log(`🔍 Testing server readiness at: ${url}`);
     for (let i = 0; i < maxAttempts; i++) {
       try {
+        console.log(`📡 Attempt ${i + 1}/${maxAttempts}: Fetching ${url}...`);
         const response = await fetch(url);
+        console.log(`📥 Response status: ${response.status} ${response.statusText}`);
+
         if (response.status === 200) {
           console.log(`✅ Server ready at ${url} after ${i + 1} attempts`);
           return true;
         }
         console.log(`⏳ Server not ready yet (attempt ${i + 1}/${maxAttempts}), status: ${response.status}`);
       } catch (err) {
-        console.log(`⏳ Server connection failed (attempt ${i + 1}/${maxAttempts})`);
+        console.log(`⏳ Server connection failed (attempt ${i + 1}/${maxAttempts}):`, err instanceof Error ? err.message : String(err));
       }
-      // Wait 6 seconds between attempts (NetGlade pattern)
-      await new Promise(resolve => setTimeout(resolve, 6000));
+
+      if (i < maxAttempts - 1) {
+        console.log(`⌛ Waiting 6 seconds before next attempt...`);
+        await new Promise(resolve => setTimeout(resolve, 6000));
+      }
     }
+    console.log(`❌ Server failed to become ready after ${maxAttempts} attempts`);
     return false;
   }
 
@@ -60,7 +68,7 @@ export function useMcpTools(): UseMcpToolsReturn {
       // Start the MCP server in E2B sandbox (NetGlade pattern)
       console.log('📦 Starting E2B sandbox...');
       const mcpSandbox = await startMcpSandbox({
-        command: 'npx -y -p @modelcontextprotocol/server-fetch @modelcontextprotocol/server-fetch',
+        command: 'npx -y @modelcontextprotocol/server-fetch',
         apiKey,
         envs: {},
         timeoutMs: 1000 * 60 * 5, // 5 minutes like NetGlade
@@ -113,6 +121,11 @@ export function useMcpTools(): UseMcpToolsReturn {
       console.log('✅ HTTP Client MCP ready!');
     } catch (err) {
       console.error('❌ Failed to start MCP server:', err);
+      console.error('Error details:', {
+        name: err instanceof Error ? err.name : 'Unknown',
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
       setError(err instanceof Error ? err : new Error(String(err)));
       setIsStarting(false);
       setIsReady(false);
