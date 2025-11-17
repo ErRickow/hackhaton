@@ -8,12 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Settings as SettingsIcon, Eye, EyeOff, Check, X, Save, Trash2 } from 'lucide-react';
+import { Settings as SettingsIcon, Eye, EyeOff, Check, X, Save, Trash2, Loader2 } from 'lucide-react';
 import { useApiKeys } from '@/hooks/useLocalStorage';
 
 interface SettingsProps {
   isOpen: boolean;
   onClose: () => void;
+  onSettingsSaved?: () => Promise<void>;
 }
 
 type Provider = 'e2b' | 'neosantara' | 'groq' | 'backendUrl';
@@ -57,26 +58,42 @@ const PROVIDERS: Record<Provider, ProviderInfo> = {
   },
 };
 
-export function Settings({ isOpen, onClose }: SettingsProps) {
+export function Settings({ isOpen, onClose, onSettingsSaved }: SettingsProps) {
   const { apiKeys, updateKey, isConfigured } = useApiKeys();
   const [selectedProvider, setSelectedProvider] = useState<Provider>('e2b');
   const [inputValue, setInputValue] = useState('');
   const [showKeys, setShowKeys] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const [isRestarting, setIsRestarting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!inputValue.trim()) {
       return;
     }
 
     updateKey(selectedProvider, inputValue.trim());
-    setSavedMessage(`${PROVIDERS[selectedProvider].name} API key saved!`);
+    setSavedMessage(`${PROVIDERS[selectedProvider].name} saved!`);
     setInputValue('');
 
-    // Clear success message after 2 seconds
-    setTimeout(() => setSavedMessage(null), 2000);
+    // Auto-restart MCP connection if backend URL or E2B key changed
+    if ((selectedProvider === 'backendUrl' || selectedProvider === 'e2b') && onSettingsSaved) {
+      setIsRestarting(true);
+      setSavedMessage(`${PROVIDERS[selectedProvider].name} saved! Restarting connection...`);
+
+      try {
+        await onSettingsSaved();
+        setSavedMessage('✅ Settings saved and connection restarted!');
+      } catch (error) {
+        setSavedMessage(`⚠️ Saved but restart failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        setIsRestarting(false);
+      }
+    }
+
+    // Clear success message after 3 seconds
+    setTimeout(() => setSavedMessage(null), 3000);
   };
 
   const handleDelete = (provider: Provider) => {
@@ -194,11 +211,20 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
             {/* Save Button */}
             <Button
               onClick={handleSave}
-              disabled={!inputValue.trim()}
+              disabled={!inputValue.trim() || isRestarting}
               className="w-full"
             >
-              <Save className="h-4 w-4 mr-2" />
-              Save {PROVIDERS[selectedProvider].name} Key
+              {isRestarting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Restarting...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save {PROVIDERS[selectedProvider].name}
+                </>
+              )}
             </Button>
           </div>
 

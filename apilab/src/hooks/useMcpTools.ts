@@ -275,6 +275,26 @@ export function useMcpTools(): UseMcpToolsReturn {
     }
   };
 
+  /**
+   * Restart MCP connection (for config changes)
+   */
+  const restartConnection = async () => {
+    console.log('🔄 Restarting MCP connection...');
+
+    // Reset state
+    setIsReady(false);
+    setIsStarting(false);
+    setError(null);
+    setTools({});
+    setMcpServer(null);
+
+    // Wait a bit before restarting
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Start again
+    await startHttpClient();
+  };
+
   // Auto-start on mount
   useEffect(() => {
     startHttpClient();
@@ -287,6 +307,7 @@ export function useMcpTools(): UseMcpToolsReturn {
     tools,
     error,
     startHttpClient,
+    restartConnection,
     mcpServer,
     callTool,
   };

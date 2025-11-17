@@ -16,7 +16,7 @@ import { useRef, useEffect, useState } from 'react'
 
 function App() {
   const { messages, input, isLoading, error, toolExecutions, handleInputChange, handleSubmit } = useApiChat()
-  const { isStarting, isReady, error: mcpError } = useMcpTools()
+  const { isStarting, isReady, error: mcpError, restartConnection } = useMcpTools()
   const { isConfigured } = useApiKeys()
   const [showSettings, setShowSettings] = useState(!isConfigured)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -191,7 +191,11 @@ function App() {
       </div>
 
       {/* Settings Modal */}
-      <Settings isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      <Settings
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onSettingsSaved={restartConnection}
+      />
     </div>
   )
 }

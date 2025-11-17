@@ -24,8 +24,25 @@ async function createMcpSandbox(apiKey: string, mcpServers: Record<string, any>)
     timeoutMs: 600_000, // 10 minutes
   });
 
-  const mcpUrl = (sandbox as any).betaGetMcpUrl();
-  const mcpToken = await (sandbox as any).betaGetMcpToken();
+  // Try both beta and stable API methods
+  let mcpUrl: string;
+  let mcpToken: string;
+
+  // Try beta methods first (betaGetMcpUrl, betaGetMcpToken)
+  if (typeof (sandbox as any).betaGetMcpUrl === 'function') {
+    mcpUrl = (sandbox as any).betaGetMcpUrl();
+    mcpToken = await (sandbox as any).betaGetMcpToken();
+  }
+  // Fallback to stable methods (getMcpUrl, getMcpToken)
+  else if (typeof (sandbox as any).getMcpUrl === 'function') {
+    mcpUrl = (sandbox as any).getMcpUrl();
+    mcpToken = await (sandbox as any).getMcpToken();
+  }
+  // Last resort: check if sandbox has mcp property directly
+  else {
+    console.error('⚠️ Available methods:', Object.keys(sandbox));
+    throw new Error('E2B Sandbox does not have getMcpUrl or betaGetMcpUrl method. Check E2B SDK version.');
+  }
 
   console.log('✅ Sandbox created successfully!');
   console.log('🔗 MCP URL:', mcpUrl);

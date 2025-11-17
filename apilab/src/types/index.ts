@@ -68,6 +68,7 @@ export interface UseMcpToolsReturn {
   tools: any; // AI SDK tools format (Record<string, any>)
   error: Error | null;
   startHttpClient: () => Promise<void>;
+  restartConnection: () => Promise<void>;
   mcpServer: any; // E2B Sandbox instance
   callTool: (toolName: string, args: Record<string, any>) => Promise<any>;
 }
