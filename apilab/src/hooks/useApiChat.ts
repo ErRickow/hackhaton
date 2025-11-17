@@ -9,7 +9,7 @@ import { streamChatCompletion, type ChatMessage } from '@/lib/groq-client';
 import type { UseApiChatReturn } from '@/types';
 
 export function useApiChat(): UseApiChatReturn {
-  const { isReady, tools } = useMcpTools();
+  const { isReady, tools, callTool } = useMcpTools();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -69,6 +69,7 @@ Be concise but informative.`;
     try {
       await streamChatCompletion(
         messagesWithSystem,
+        tools, // Pass the MCP tools
         // On each chunk
         (chunk) => {
           assistantMessage += chunk;
@@ -87,6 +88,18 @@ Be concise but informative.`;
           console.error('Chat error:', err);
           setError(err);
           setIsLoading(false);
+        },
+        // Tool call handler
+        async (toolName: string, args: Record<string, any>) => {
+          console.log('🔧 Tool call requested:', toolName, args);
+          try {
+            const result = await callTool(toolName, args);
+            console.log('✓ Tool call result:', result);
+            return result;
+          } catch (error) {
+            console.error('❌ Tool call error:', error);
+            throw error;
+          }
         }
       );
     } catch (err) {

@@ -29,30 +29,55 @@ export function useMcpTools(): UseMcpToolsReturn {
       }
 
       // Start the MCP server in E2B sandbox
-      // For now, use the filesystem server as a test
-      // TODO: Upload our custom HTTP client MCP server
+      // Using @sylphlab/tools-fetch-mcp for HTTP requests
       const mcp = await startMcpSandbox({
-        command: 'npx -y @modelcontextprotocol/server-filesystem /tmp',
+        command: 'npx -y @sylphlab/tools-fetch-mcp',
         apiKey,
       });
 
       console.log('✓ MCP server started');
       console.log('  URL:', mcp.getUrl());
 
-      // Get available tools
-      // TODO: Implement getTools() - for now using mock tools
-      const availableTools: McpTool[] = [
-        {
-          name: 'list_directory',
-          description: 'List files in a directory',
-          inputSchema: {
-            type: 'object',
-            properties: { path: { type: 'string' } },
-            required: ['path'],
+      // Get available tools from the MCP server
+      let availableTools: McpTool[] = [];
+      try {
+        availableTools = await (mcp as any).listTools();
+        console.log('✓ Tools loaded from MCP server:', availableTools.length);
+        console.log('  Available tools:', availableTools.map(t => t.name).join(', '));
+      } catch (error) {
+        console.warn('Could not load tools from MCP server, using defaults:', error);
+        // Fallback tools based on typical fetch-mcp capabilities
+        availableTools = [
+          {
+            name: 'fetch',
+            description: 'Make an HTTP request to a URL and return the response',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                url: {
+                  type: 'string',
+                  description: 'The URL to fetch',
+                },
+                method: {
+                  type: 'string',
+                  description: 'HTTP method (GET, POST, PUT, DELETE, etc.)',
+                  enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'],
+                },
+                headers: {
+                  type: 'object',
+                  description: 'HTTP headers as key-value pairs',
+                },
+                body: {
+                  type: 'string',
+                  description: 'Request body (for POST, PUT, PATCH)',
+                },
+              },
+              required: ['url'],
+            },
           },
-        },
-      ];
-      console.log('✓ Tools loaded:', availableTools.length);
+        ];
+      }
+      console.log('✓ Tools ready:', availableTools.length);
 
       setMcpServer(mcp as any);
       setTools(availableTools);
@@ -68,6 +93,26 @@ export function useMcpTools(): UseMcpToolsReturn {
     }
   };
 
+  const callTool = async (toolName: string, args: Record<string, any>) => {
+    if (!mcpServer) {
+      throw new Error('MCP server not initialized');
+    }
+
+    try {
+      console.log(`🔧 Calling MCP tool: ${toolName}`, args);
+
+      // Call the tool through the MCP server
+      // The MCP server should have a callTool method
+      const result = await (mcpServer as any).callTool(toolName, args);
+
+      console.log('✓ MCP tool result:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ MCP tool call failed:', error);
+      throw error;
+    }
+  };
+
   // Auto-start on mount
   useEffect(() => {
     startHttpClient();
@@ -80,5 +125,6 @@ export function useMcpTools(): UseMcpToolsReturn {
     error,
     startHttpClient,
     mcpServer,
+    callTool,
   };
 }

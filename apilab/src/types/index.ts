@@ -69,6 +69,7 @@ export interface UseMcpToolsReturn {
   error: Error | null;
   startHttpClient: () => Promise<void>;
   mcpServer: McpServer | null;
+  callTool: (toolName: string, args: Record<string, any>) => Promise<any>;
 }
 
 export interface UseApiChatReturn {
