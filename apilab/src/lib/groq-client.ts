@@ -4,6 +4,7 @@
  */
 
 import Groq from 'groq-sdk';
+import OpenAI from 'openai';
 
 export type LLMProvider = 'neosantara' | 'groq';
 
@@ -22,7 +23,7 @@ function getApiKeys() {
   return { neosantara: '', groq: '', e2b: '' };
 }
 
-export function createLLMClient(provider: LLMProvider = 'neosantara') {
+export function createLLMClient(provider: LLMProvider = 'neosantara'): OpenAI | Groq {
   const apiKeys = getApiKeys();
 
   if (provider === 'neosantara') {
@@ -32,8 +33,8 @@ export function createLLMClient(provider: LLMProvider = 'neosantara') {
       throw new Error('Neosantara API key not found. Please configure it in Settings.');
     }
 
-    // Neosantara is OpenAI-compatible, so we can use Groq SDK with custom baseURL
-    return new Groq({
+    // Use OpenAI SDK with Neosantara baseURL
+    return new OpenAI({
       apiKey,
       baseURL: 'https://api.neosantara.xyz/v1',
       dangerouslyAllowBrowser: true,
@@ -97,8 +98,8 @@ export async function streamChatCompletion(
     const client = createLLMClient(provider);
     const modelName = getModelName(provider);
 
-    // Convert MCP tools to Groq format
-    const groqTools = tools.map(tool => ({
+    // Convert MCP tools to OpenAI/Groq format
+    const formattedTools = tools.map(tool => ({
       type: 'function' as const,
       function: {
         name: tool.name,
@@ -108,32 +109,37 @@ export async function streamChatCompletion(
     }));
 
     console.log(`🤖 Using ${provider} with model: ${modelName}`);
+    console.log(`🔗 BaseURL: ${provider === 'neosantara' ? 'https://api.neosantara.xyz/v1' : 'default groq'}`);
 
-    const stream = await client.chat.completions.create({
-      messages: messages.map(m => {
-        if (m.role === 'tool') {
-          return {
-            role: 'tool' as const,
-            content: m.content,
-            tool_call_id: m.tool_call_id!,
-          };
-        } else if (m.role === 'assistant' && m.tool_calls) {
-          return {
-            role: 'assistant' as const,
-            content: m.content || null,
-            tool_calls: m.tool_calls,
-          };
-        } else {
-          return {
-            role: m.role as 'user' | 'assistant' | 'system',
-            content: m.content,
-          };
-        }
-      }),
+    // Format messages for API
+    const formattedMessages = messages.map(m => {
+      if (m.role === 'tool') {
+        return {
+          role: 'tool' as const,
+          content: m.content,
+          tool_call_id: m.tool_call_id!,
+        };
+      } else if (m.role === 'assistant' && m.tool_calls) {
+        return {
+          role: 'assistant' as const,
+          content: m.content || null,
+          tool_calls: m.tool_calls,
+        };
+      } else {
+        return {
+          role: m.role as 'user' | 'assistant' | 'system',
+          content: m.content,
+        };
+      }
+    });
+
+    // Create stream - cast to any to handle union type
+    const stream = await (client as any).chat.completions.create({
+      messages: formattedMessages,
       model: modelName,
       temperature: 0.5,
       max_tokens: 1024,
-      tools: groqTools.length > 0 ? groqTools : undefined,
+      tools: formattedTools.length > 0 ? formattedTools : undefined,
       stream: true,
     });
 
