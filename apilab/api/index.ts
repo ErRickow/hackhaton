@@ -3,16 +3,10 @@
  * Handles E2B MCP sandbox creation (Node.js only operations)
  */
 
+import { createServer } from 'node:http';
 import Sandbox from 'e2b';
 
 const PORT = process.env.PORT || 3001;
-
-// Simple CORS headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
 
 // In-memory cache for sandboxes (in production, use Redis/DB)
 const sandboxCache = new Map<string, any>();
@@ -48,100 +42,128 @@ async function createMcpSandbox(apiKey: string, mcpServers: Record<string, any>)
 }
 
 /**
+ * Parse JSON body from request
+ */
+async function parseBody(req: any): Promise<any> {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk: any) => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+/**
+ * Send JSON response with CORS
+ */
+function sendJSON(res: any, data: any, status = 200) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  });
+  res.end(JSON.stringify(data));
+}
+
+/**
  * Main HTTP server
  */
-const server = Bun.serve({
-  port: PORT,
-  async fetch(req) {
-    const url = new URL(req.url);
+const server = createServer(async (req, res) => {
+  const url = new URL(req.url!, `http://${req.headers.host}`);
 
-    // Handle CORS preflight
-    if (req.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
-    }
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    });
+    res.end();
+    return;
+  }
 
-    // Health check
-    if (url.pathname === '/health') {
-      return Response.json(
-        { status: 'ok', timestamp: new Date().toISOString() },
-        { headers: corsHeaders }
-      );
-    }
+  // Health check
+  if (url.pathname === '/health') {
+    sendJSON(res, { status: 'ok', timestamp: new Date().toISOString() });
+    return;
+  }
 
-    // Create MCP sandbox
-    if (url.pathname === '/api/mcp/init' && req.method === 'POST') {
-      try {
-        const body = await req.json();
-        const { apiKey, mcpServers } = body;
+  // Create MCP sandbox
+  if (url.pathname === '/api/mcp/init' && req.method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      const { apiKey, mcpServers } = body;
 
-        if (!apiKey) {
-          return Response.json(
-            { error: 'E2B API key is required' },
-            { status: 400, headers: corsHeaders }
-          );
-        }
-
-        // Default MCP servers if not specified
-        const servers = mcpServers || {
-          duckduckgo: {},
-          arxiv: { storagePath: '/' },
-        };
-
-        const result = await createMcpSandbox(apiKey, servers);
-
-        return Response.json(result, { headers: corsHeaders });
-      } catch (error: any) {
-        console.error('❌ Failed to create sandbox:', error);
-        return Response.json(
-          {
-            error: error.message || 'Failed to create MCP sandbox',
-            details: error.stack,
-          },
-          { status: 500, headers: corsHeaders }
-        );
-      }
-    }
-
-    // Get sandbox info
-    if (url.pathname.startsWith('/api/mcp/sandbox/') && req.method === 'GET') {
-      const sandboxId = url.pathname.split('/').pop();
-      const sandbox = sandboxCache.get(sandboxId || '');
-
-      if (!sandbox) {
-        return Response.json(
-          { error: 'Sandbox not found' },
-          { status: 404, headers: corsHeaders }
-        );
+      if (!apiKey) {
+        sendJSON(res, { error: 'E2B API key is required' }, 400);
+        return;
       }
 
-      const isRunning = await sandbox.isRunning?.() || false;
+      // Default MCP servers if not specified
+      const servers = mcpServers || {
+        duckduckgo: {},
+        arxiv: { storagePath: '/' },
+      };
 
-      return Response.json(
+      const result = await createMcpSandbox(apiKey, servers);
+      sendJSON(res, result);
+    } catch (error: any) {
+      console.error('❌ Failed to create sandbox:', error);
+      sendJSON(
+        res,
         {
-          sandboxId,
-          isRunning,
-          url: (sandbox as any).betaGetMcpUrl?.(),
+          error: error.message || 'Failed to create MCP sandbox',
+          details: error.stack,
         },
-        { headers: corsHeaders }
+        500
       );
     }
+    return;
+  }
 
-    // 404
-    return Response.json(
-      { error: 'Not found' },
-      { status: 404, headers: corsHeaders }
-    );
-  },
+  // Get sandbox info
+  if (url.pathname.startsWith('/api/mcp/sandbox/') && req.method === 'GET') {
+    const sandboxId = url.pathname.split('/').pop();
+    const sandbox = sandboxCache.get(sandboxId || '');
+
+    if (!sandbox) {
+      sendJSON(res, { error: 'Sandbox not found' }, 404);
+      return;
+    }
+
+    const isRunning = (await sandbox.isRunning?.()) || false;
+
+    sendJSON(res, {
+      sandboxId,
+      isRunning,
+      url: (sandbox as any).betaGetMcpUrl?.(),
+    });
+    return;
+  }
+
+  // 404
+  sendJSON(res, { error: 'Not found' }, 404);
 });
 
-console.log('');
-console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-console.log('🚀 APILab Backend Server');
-console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-console.log('');
-console.log(`📍 Server running at: http://localhost:${PORT}`);
-console.log(`🔍 Health check:      http://localhost:${PORT}/health`);
-console.log(`🌐 MCP Init endpoint: http://localhost:${PORT}/api/mcp/init`);
-console.log('');
-console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-console.log('');
+server.listen(PORT, () => {
+  console.log('');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🚀 APILab Backend Server (Node.js)');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
+  console.log(`📍 Server running at: http://localhost:${PORT}`);
+  console.log(`🔍 Health check:      http://localhost:${PORT}/health`);
+  console.log(`🌐 MCP Init endpoint: http://localhost:${PORT}/api/mcp/init`);
+  console.log('');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
+});

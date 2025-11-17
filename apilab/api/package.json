@@ -3,15 +3,16 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "bun run index.ts",
-    "start": "bun run index.ts"
+    "dev": "tsx watch index.ts",
+    "start": "node index.js",
+    "build": "tsc"
   },
   "dependencies": {
-    "e2b": "^2.7.0",
-    "cors": "^2.8.5"
+    "e2b": "^2.7.0"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "@types/cors": "^2.8.17"
+    "@types/node": "^24.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3"
   }
 }
