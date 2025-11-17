@@ -77,7 +77,18 @@ export interface UseApiChatReturn {
   input: string;
   isLoading: boolean;
   error: Error | null;
+  toolExecutions: Array<{
+    id: string;
+    toolName: string;
+    status: 'pending' | 'running' | 'complete' | 'error';
+    args?: Record<string, any>;
+    result?: any;
+    error?: string;
+    startTime?: number;
+    endTime?: number;
+  }>;
   handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleSubmit: (e: React.FormEvent) => void;
   stop: () => void;
+  clearToolExecutions: () => void;
 }

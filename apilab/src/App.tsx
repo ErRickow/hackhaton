@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Beaker, Send, Loader2, AlertCircle, Settings as SettingsIcon } from 'lucide-react'
 import { ChatMessage } from '@/components/ChatMessage'
+import { ToolExecutionCard } from '@/components/ToolExecutionCard'
 import { WebhookMonitor } from '@/components/WebhookMonitor'
 import { Settings } from '@/components/Settings'
 import { useApiChat } from '@/hooks/useApiChat'
@@ -12,7 +13,7 @@ import { useApiKeys } from '@/hooks/useLocalStorage'
 import { useRef, useEffect, useState } from 'react'
 
 function App() {
-  const { messages, input, isLoading, error, handleInputChange, handleSubmit } = useApiChat()
+  const { messages, input, isLoading, error, toolExecutions, handleInputChange, handleSubmit } = useApiChat()
   const { isStarting, isReady, error: mcpError } = useMcpTools()
   const {
     webhookUrl,
@@ -184,8 +185,28 @@ function App() {
                         key={index}
                         role={message.role}
                         content={message.content}
+                        isStreaming={isLoading && index === messages.length - 1}
                       />
                     ))}
+
+                    {/* Tool Execution Cards */}
+                    {toolExecutions.length > 0 && (
+                      <div className="space-y-2">
+                        {toolExecutions.map((execution) => (
+                          <ToolExecutionCard
+                            key={execution.id}
+                            toolName={execution.toolName}
+                            status={execution.status}
+                            args={execution.args}
+                            result={execution.result}
+                            error={execution.error}
+                            startTime={execution.startTime}
+                            endTime={execution.endTime}
+                          />
+                        ))}
+                      </div>
+                    )}
+
                     <div ref={messagesEndRef} />
                   </>
                 )}

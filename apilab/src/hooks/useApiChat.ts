@@ -7,6 +7,18 @@ import { useState, useRef } from 'react';
 import { useMcpTools } from './useMcpTools';
 import { streamChatCompletion, type ChatMessage } from '@/lib/groq-client';
 import type { UseApiChatReturn } from '@/types';
+import type { ToolStatus } from '@/components/ToolExecutionCard';
+
+export interface ToolExecution {
+  id: string;
+  toolName: string;
+  status: ToolStatus;
+  args?: Record<string, any>;
+  result?: any;
+  error?: string;
+  startTime?: number;
+  endTime?: number;
+}
 
 export function useApiChat(): UseApiChatReturn {
   const { isReady, tools, callTool } = useMcpTools();
@@ -14,6 +26,7 @@ export function useApiChat(): UseApiChatReturn {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [toolExecutions, setToolExecutions] = useState<ToolExecution[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,12 +123,46 @@ Be concise but informative.`;
         // Tool call handler
         async (toolName: string, args: Record<string, any>) => {
           console.log('🔧 Tool call requested:', toolName, args);
+
+          const executionId = `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const startTime = Date.now();
+
+          // Add pending execution
+          const newExecution: ToolExecution = {
+            id: executionId,
+            toolName,
+            status: 'running',
+            args,
+            startTime,
+          };
+          setToolExecutions(prev => [...prev, newExecution]);
+
           try {
             const result = await callTool(toolName, args);
             console.log('✓ Tool call result:', result);
+
+            // Update to complete
+            setToolExecutions(prev =>
+              prev.map(exec =>
+                exec.id === executionId
+                  ? { ...exec, status: 'complete', result, endTime: Date.now() }
+                  : exec
+              )
+            );
+
             return result;
           } catch (error) {
             console.error('❌ Tool call error:', error);
+
+            // Update to error
+            setToolExecutions(prev =>
+              prev.map(exec =>
+                exec.id === executionId
+                  ? { ...exec, status: 'error', error: String(error), endTime: Date.now() }
+                  : exec
+              )
+            );
+
             throw error;
           }
         },
@@ -139,13 +186,19 @@ Be concise but informative.`;
     }
   };
 
+  const clearToolExecutions = () => {
+    setToolExecutions([]);
+  };
+
   return {
     messages: messages as any,
     input,
     isLoading,
     error,
+    toolExecutions,
     handleInputChange,
     handleSubmit,
     stop,
+    clearToolExecutions,
   };
 }

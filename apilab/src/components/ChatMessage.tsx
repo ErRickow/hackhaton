@@ -6,13 +6,15 @@
 import { User, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ApiResponse } from './ApiResponse';
+import { ThinkingIndicator } from './ThinkingIndicator';
 
 interface ChatMessageProps {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  isStreaming?: boolean;
 }
 
-export function ChatMessage({ role, content }: ChatMessageProps) {
+export function ChatMessage({ role, content, isStreaming = false }: ChatMessageProps) {
   const isUser = role === 'user';
   const isSystem = role === 'system';
 
@@ -89,7 +91,9 @@ export function ChatMessage({ role, content }: ChatMessageProps) {
         </div>
 
         {/* Text content */}
-        {parsed ? (
+        {!content && isStreaming ? (
+          <ThinkingIndicator message="Analyzing request and preparing response..." />
+        ) : parsed ? (
           <>
             {parsed.remainingText && (
               <div className="text-sm whitespace-pre-wrap break-words">
@@ -109,7 +113,7 @@ export function ChatMessage({ role, content }: ChatMessageProps) {
           </>
         ) : (
           <div className="text-sm whitespace-pre-wrap break-words">
-            {content || <span className="text-muted-foreground italic">Thinking...</span>}
+            {content}
           </div>
         )}
       </div>
