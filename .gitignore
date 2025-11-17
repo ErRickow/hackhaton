@@ -1,0 +1,18 @@
+# Cloned repositories for analysis (not our code)
+mcp-chat/
+mcp-sandbox-repo/
+
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
