@@ -46,9 +46,13 @@ export function useWebhooks(): UseWebhooksReturn {
     try {
       console.log('🚀 Starting Webhook Receiver MCP server in E2B sandbox...');
 
-      const apiKey = import.meta.env.VITE_E2B_API_KEY;
+      // Get E2B API key from localStorage
+      const stored = window.localStorage.getItem('apilab_api_keys');
+      const apiKeys = stored ? JSON.parse(stored) : {};
+      const apiKey = apiKeys.e2b;
+
       if (!apiKey) {
-        throw new Error('E2B API key not found. Please set VITE_E2B_API_KEY in .env file.');
+        throw new Error('E2B API key not found. Please configure it in Settings.');
       }
 
       // Start the webhook receiver MCP server in E2B sandbox

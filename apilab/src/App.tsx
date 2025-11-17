@@ -1,13 +1,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Beaker, Send, Loader2, AlertCircle } from 'lucide-react'
+import { Beaker, Send, Loader2, AlertCircle, Settings as SettingsIcon } from 'lucide-react'
 import { ChatMessage } from '@/components/ChatMessage'
 import { WebhookMonitor } from '@/components/WebhookMonitor'
+import { Settings } from '@/components/Settings'
 import { useApiChat } from '@/hooks/useApiChat'
 import { useMcpTools } from '@/hooks/useMcpTools'
 import { useWebhooks } from '@/hooks/useWebhooks'
-import { useRef, useEffect } from 'react'
+import { useApiKeys } from '@/hooks/useLocalStorage'
+import { useRef, useEffect, useState } from 'react'
 
 function App() {
   const { messages, input, isLoading, error, handleInputChange, handleSubmit } = useApiChat()
@@ -20,6 +22,8 @@ function App() {
     refreshEvents,
     clearEvents,
   } = useWebhooks()
+  const { isConfigured } = useApiKeys()
+  const [showSettings, setShowSettings] = useState(!isConfigured)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when new messages arrive
@@ -69,7 +73,8 @@ function App() {
             <Button variant="ghost" size="sm">
               Docs
             </Button>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)}>
+              <SettingsIcon className="h-4 w-4 mr-2" />
               Settings
             </Button>
             <Button variant="outline" size="sm">
@@ -232,10 +237,13 @@ function App() {
       <footer className="border-t mt-16">
         <div className="container mx-auto px-4 py-6">
           <p className="text-center text-sm text-muted-foreground">
-            Powered by E2B Sandboxes • MCP Servers • Groq AI
+            Powered by E2B Sandboxes • MCP Servers • Neosantara AI
           </p>
         </div>
       </footer>
+
+      {/* Settings Modal */}
+      <Settings isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>
   )
 }

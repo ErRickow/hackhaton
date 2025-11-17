@@ -7,30 +7,47 @@ import Groq from 'groq-sdk';
 
 export type LLMProvider = 'neosantara' | 'groq';
 
+/**
+ * Get API keys from localStorage
+ */
+function getApiKeys() {
+  try {
+    const stored = window.localStorage.getItem('apilab_api_keys');
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error('Failed to load API keys from localStorage:', error);
+  }
+  return { neosantara: '', groq: '', e2b: '' };
+}
+
 export function createLLMClient(provider: LLMProvider = 'neosantara') {
+  const apiKeys = getApiKeys();
+
   if (provider === 'neosantara') {
-    const apiKey = import.meta.env.VITE_NEOSANTARA_API_KEY;
+    const apiKey = apiKeys.neosantara;
 
     if (!apiKey) {
-      throw new Error('Neosantara API key not found. Please set VITE_NEOSANTARA_API_KEY in .env file.');
+      throw new Error('Neosantara API key not found. Please configure it in Settings.');
     }
 
     // Neosantara is OpenAI-compatible, so we can use Groq SDK with custom baseURL
     return new Groq({
       apiKey,
       baseURL: 'https://api.neosantara.xyz/v1',
-      dangerouslyAllowBrowser: true, // For dev only - move to backend in production!
+      dangerouslyAllowBrowser: true,
     });
   } else {
-    const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+    const apiKey = apiKeys.groq;
 
     if (!apiKey) {
-      throw new Error('Groq API key not found. Please set VITE_GROQ_API_KEY in .env file.');
+      throw new Error('Groq API key not found. Please configure it in Settings.');
     }
 
     return new Groq({
       apiKey,
-      dangerouslyAllowBrowser: true, // For dev only - move to backend in production!
+      dangerouslyAllowBrowser: true,
     });
   }
 }
