@@ -1,20 +1,19 @@
 /**
  * useMcpTools Hook
- * Manages E2B sandbox and MCP server lifecycle (E2B Official Beta MCP API)
+ * Manages E2B MCP connection via backend API (Option 4: Full Browser SSE Client)
  */
 
 import { useState, useEffect } from 'react';
-import Sandbox from 'e2b';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { UseMcpToolsReturn } from '@/types';
 import { z } from 'zod';
 
-// Type for E2B Sandbox instance
-type E2BSandbox = Awaited<ReturnType<typeof Sandbox.betaCreate>>;
+// Backend API URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export function useMcpTools(): UseMcpToolsReturn {
-  const [mcpServer, setMcpServer] = useState<E2BSandbox | null>(null);
+  const [mcpServer, setMcpServer] = useState<any>(null);
   const [tools, setTools] = useState<any>({}); // Store AI SDK tools format
   const [isStarting, setIsStarting] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -136,7 +135,7 @@ export function useMcpTools(): UseMcpToolsReturn {
 
     try {
       console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('🚀 Starting E2B Sandbox with Built-in MCP Gateway');
+      console.log('🚀 Starting E2B MCP via Backend API (Option 4)');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
       console.log('⏱️  This may take 30-60 seconds for first boot...\n');
 
@@ -152,40 +151,46 @@ export function useMcpTools(): UseMcpToolsReturn {
         throw new Error('E2B API key not found. Please configure it in Settings.');
       }
 
-      // Create E2B sandbox with built-in MCP servers (Official Beta API)
-      console.log('\n📦 Step 1: Creating E2B sandbox with MCP gateway...');
-      console.log('🔧 Using E2B Official Beta MCP API');
-      console.log('🌐 MCP Servers: duckduckgo, arxiv\n');
+      // Call backend API to create MCP sandbox
+      console.log('\n📡 Step 1: Calling backend API to create E2B sandbox...');
+      console.log(`   API URL: ${API_BASE_URL}/api/mcp/init`);
 
-      const sandbox = await Sandbox.betaCreate({
-        apiKey,
-        mcp: {
-          duckduckgo: {},  // Built-in DuckDuckGo search
-          arxiv: { storagePath: '/' },  // Built-in arXiv research
+      const initResponse = await fetch(`${API_BASE_URL}/api/mcp/init`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        timeoutMs: 600_000, // 10 minutes
+        body: JSON.stringify({
+          apiKey,
+          mcpServers: {
+            duckduckgo: {},
+            arxiv: { storagePath: '/' },
+          }
+        })
       });
 
-      console.log('✅ E2B sandbox created successfully!');
+      if (!initResponse.ok) {
+        const errorData = await initResponse.json();
+        throw new Error(`Backend API error: ${errorData.error || initResponse.statusText}`);
+      }
 
-      // Get MCP gateway URL and auth token
-      console.log('\n🔗 Step 2: Getting MCP gateway URL and token...');
-      const mcpUrl = (sandbox as any).betaGetMcpUrl();
-      const mcpToken = await (sandbox as any).betaGetMcpToken();
+      const { sandboxId, mcpUrl, mcpToken } = await initResponse.json();
 
-      console.log(`📍 MCP URL: ${mcpUrl}`);
-      console.log(`🔐 Auth token: ${mcpToken ? '✅ Obtained' : '❌ Missing'}\n`);
+      console.log('✅ Backend API returned sandbox info!');
+      console.log(`   Sandbox ID: ${sandboxId}`);
+      console.log(`   MCP URL: ${mcpUrl}`);
+      console.log(`   Token: ${mcpToken ? '✅ Obtained' : '❌ Missing'}\n`);
 
       // Wait for gateway to be ready
-      console.log('📡 Step 3: Waiting for MCP gateway to be ready...');
+      console.log('📡 Step 2: Waiting for MCP gateway to be ready...');
       const isGatewayReady = await waitForServerReady(mcpUrl, mcpToken, 10);
 
       if (!isGatewayReady) {
         throw new Error('MCP gateway failed to start within timeout period');
       }
 
-      // Create MCP client with authentication
-      console.log('\n🔌 Step 4: Creating MCP client with authentication...');
+      // Create MCP client with authentication (BROWSER-COMPATIBLE!)
+      console.log('\n🔌 Step 3: Creating MCP client (browser-compatible)...');
       const client = new Client({
         name: 'apilab-mcp-client',
         version: '1.0.0'
@@ -203,7 +208,7 @@ export function useMcpTools(): UseMcpToolsReturn {
       console.log('✅ MCP client connected!\n');
 
       // List available tools
-      console.log('🔧 Step 5: Fetching available tools from MCP gateway...');
+      console.log('🔧 Step 4: Fetching available tools from MCP gateway...');
       const toolsList = await client.listTools();
 
       console.log('\n✅ Tools loaded successfully!');
@@ -214,12 +219,12 @@ export function useMcpTools(): UseMcpToolsReturn {
       });
 
       // Convert MCP tools to AI SDK format
-      console.log('\n🔄 Step 6: Converting tools to AI SDK format...');
+      console.log('\n🔄 Step 5: Converting tools to AI SDK format...');
       const aiSdkTools = convertMcpToolsToAiSdk(toolsList.tools);
       console.log(`✅ Converted ${Object.keys(aiSdkTools).length} tools to AI SDK format\n`);
 
       // Store everything
-      setMcpServer(sandbox);
+      setMcpServer({ sandboxId, mcpUrl, mcpToken, client });
       setTools(aiSdkTools);
       setIsReady(true);
       setIsStarting(false);
