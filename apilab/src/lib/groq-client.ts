@@ -99,7 +99,8 @@ export async function streamChatCompletion(
     const modelName = getModelName(provider);
 
     console.log(`🤖 Using ${provider} with model: ${modelName}`);
-    console.log(`🔗 BaseURL: ${provider === 'neosantara' ? 'https://api.neosantara.xyz/v1' : 'https://api.groq.com/openai/v1'}`);
+    console.log(`🔗 Endpoint: ${provider === 'neosantara' ? 'https://api.neosantara.xyz/v1/chat/completions' : 'https://api.groq.com/openai/v1/chat/completions'}`);
+    console.log(`✓ Using Chat Completions API (not Responses API)`);
 
     // Convert MCP tools to AI SDK format
     const aiTools: Record<string, any> = {};
@@ -126,7 +127,7 @@ export async function streamChatCompletion(
       }));
 
     const result = await streamText({
-      model: llmProvider(modelName),
+      model: llmProvider.chat(modelName), // Force use Chat Completions API (/v1/chat/completions)
       messages: formattedMessages,
       tools: Object.keys(aiTools).length > 0 ? aiTools : undefined,
       temperature: 0.5,
