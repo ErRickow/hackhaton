@@ -92,9 +92,12 @@ export function useMcpTools(): UseMcpToolsReturn {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
     try {
-      // Get config from localStorage
-      const apiKey = localStorage.getItem('e2bApiKey');
-      const backendUrl = localStorage.getItem('backendUrl');
+      // Get config from localStorage (stored as single object)
+      const apiKeysJson = localStorage.getItem('apilab_api_keys');
+      const apiKeys = apiKeysJson ? JSON.parse(apiKeysJson) : {};
+
+      const apiKey = apiKeys.e2b;
+      const backendUrl = apiKeys.backendUrl;
 
       if (!apiKey) {
         throw new Error('E2B API key not found. Please configure it in Settings.');
