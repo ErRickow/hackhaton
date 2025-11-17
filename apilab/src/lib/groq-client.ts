@@ -126,14 +126,15 @@ export async function streamChatCompletion(
         content: m.content,
       }));
 
-    const result = await streamText({
-      model: llmProvider.chat(modelName), // Force use Chat Completions API (/v1/chat/completions)
+    const result = streamText({
+      model: llmProvider(modelName), // Use standard model call for v4
       messages: formattedMessages,
       tools: Object.keys(aiTools).length > 0 ? aiTools : undefined,
       temperature: 0.5,
+      maxSteps: 10, // Allow multiple tool call rounds
       onChunk: ({ chunk }) => {
         if (chunk.type === 'text-delta') {
-          onChunk(chunk.text);
+          onChunk(chunk.textDelta);
         }
       },
       onFinish: ({ toolCalls }) => {

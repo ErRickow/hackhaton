@@ -1,21 +1,42 @@
 /**
  * useMcpTools Hook
- * Manages E2B sandbox, MCP server lifecycle, and MCP client
+ * Manages E2B sandbox and MCP server lifecycle (NetGlade pattern)
  */
 
 import { useState, useEffect } from 'react';
 import { startMcpSandbox } from '@netglade/mcp-sandbox';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { experimental_createMCPClient } from 'ai';
 import type { UseMcpToolsReturn, McpTool, McpServer } from '@/types';
 
 export function useMcpTools(): UseMcpToolsReturn {
   const [mcpServer, setMcpServer] = useState<McpServer | null>(null);
-  const [mcpClient, setMcpClient] = useState<Client | null>(null);
+  const [mcpClient, setMcpClient] = useState<any>(null);
   const [tools, setTools] = useState<McpTool[]>([]);
   const [isStarting, setIsStarting] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  /**
+   * Wait for MCP server to be ready by polling the URL
+   * NetGlade pattern: retry up to maxAttempts with 6s delay
+   */
+  async function waitForServerReady(url: string, maxAttempts = 5): Promise<boolean> {
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const response = await fetch(url);
+        if (response.status === 200) {
+          console.log(`✅ Server ready at ${url} after ${i + 1} attempts`);
+          return true;
+        }
+        console.log(`⏳ Server not ready yet (attempt ${i + 1}/${maxAttempts}), status: ${response.status}`);
+      } catch (err) {
+        console.log(`⏳ Server connection failed (attempt ${i + 1}/${maxAttempts})`);
+      }
+      // Wait 6 seconds between attempts (NetGlade pattern)
+      await new Promise(resolve => setTimeout(resolve, 6000));
+    }
+    return false;
+  }
 
   const startHttpClient = async () => {
     if (isStarting || isReady) return;
@@ -36,96 +57,55 @@ export function useMcpTools(): UseMcpToolsReturn {
         throw new Error('E2B API key not found. Please configure it in Settings.');
       }
 
-      // Start the MCP server in E2B sandbox
-      // Using fetch-mcp (official MCP server for HTTP requests)
+      // Start the MCP server in E2B sandbox (NetGlade pattern)
       console.log('📦 Starting E2B sandbox...');
       const mcpSandbox = await startMcpSandbox({
         command: 'npx -y -p @modelcontextprotocol/server-fetch @modelcontextprotocol/server-fetch',
         apiKey,
-        timeoutMs: 1000 * 60 * 15, // 15 minutes timeout
+        envs: {},
+        timeoutMs: 1000 * 60 * 5, // 5 minutes like NetGlade
       });
 
-      console.log('✅ MCP sandbox started successfully!');
       const serverUrl = mcpSandbox.getUrl();
+      console.log('✅ MCP sandbox started!');
       console.log('🔗 Server URL:', serverUrl);
 
-      // Wait for MCP server to be fully ready (supergateway + MCP server boot time)
-      console.log('⏳ Waiting for MCP server to initialize...');
-      await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds
+      // Wait for MCP server to be fully ready (NetGlade pattern)
+      console.log('⏳ Waiting for MCP server to be ready...');
+      const isReady = await waitForServerReady(serverUrl, 5);
 
-      // Create MCP client with SSE transport
-      console.log('🔌 Creating MCP client...');
-      const client = new Client(
-        {
-          name: 'apilab-mcp-client',
-          version: '1.0.0',
-        },
-        {
-          capabilities: {},
-        }
-      );
-
-      // Connect to MCP server via SSE
-      console.log('🔌 Connecting to MCP server via SSE...');
-      const transport = new SSEClientTransport(new URL(serverUrl));
-      await client.connect(transport);
-      console.log('✅ MCP client connected successfully!');
-
-      // Get available tools from the MCP server
-      let availableTools: McpTool[] = [];
-      try {
-        const toolsResponse = await client.listTools();
-        console.log('✓ Raw tools response:', toolsResponse);
-
-        // Convert MCP tools to our format
-        availableTools = toolsResponse.tools.map((tool: any) => ({
-          name: tool.name,
-          description: tool.description || '',
-          inputSchema: tool.inputSchema || {
-            type: 'object',
-            properties: {},
-          },
-        }));
-
-        console.log('✓ Tools loaded from MCP server:', availableTools.length);
-        console.log('  Available tools:', availableTools.map(t => t.name).join(', '));
-      } catch (err) {
-        console.warn('Could not load tools from MCP server, using defaults:', err);
-        // Fallback tools based on typical fetch-mcp capabilities
-        availableTools = [
-          {
-            name: 'fetch',
-            description: 'Make an HTTP request to a URL and return the response',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                url: {
-                  type: 'string',
-                  description: 'The URL to fetch',
-                },
-                method: {
-                  type: 'string',
-                  description: 'HTTP method (GET, POST, PUT, DELETE, etc.)',
-                  enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'],
-                },
-                headers: {
-                  type: 'object',
-                  description: 'HTTP headers as key-value pairs',
-                },
-                body: {
-                  type: 'string',
-                  description: 'Request body (for POST, PUT, PATCH)',
-                },
-              },
-              required: ['url'],
-            },
-          },
-        ];
+      if (!isReady) {
+        throw new Error('MCP server failed to start within timeout period');
       }
-      console.log('✓ Tools ready:', availableTools.length);
+
+      // Create MCP client using AI SDK (NetGlade pattern)
+      console.log('🔌 Creating MCP client with AI SDK...');
+      const aiClient = await experimental_createMCPClient({
+        transport: {
+          type: 'sse',
+          url: serverUrl,
+        },
+      });
+
+      // Get tools from client (NetGlade pattern)
+      console.log('🔧 Fetching available tools...');
+      const mcpTools = await aiClient.tools();
+      console.log('✅ Tools loaded:', Object.keys(mcpTools).length);
+
+      // Convert AI SDK tools format to our format
+      const availableTools: McpTool[] = Object.entries(mcpTools).map(([name, tool]: [string, any]) => ({
+        name,
+        description: tool.description || '',
+        inputSchema: tool.parameters || {
+          type: 'object',
+          properties: {},
+        },
+      }));
+
+      console.log('📋 Available tools:', availableTools.map(t => t.name).join(', '));
 
       setMcpServer(mcpSandbox as any);
-      setMcpClient(client);
+      setMcpClient(aiClient);
       setTools(availableTools);
       setIsReady(true);
       setIsStarting(false);
@@ -147,30 +127,17 @@ export function useMcpTools(): UseMcpToolsReturn {
     try {
       console.log(`🔧 Calling MCP tool: ${toolName}`, args);
 
-      // Call the tool through the MCP client
-      const result = await mcpClient.callTool({
-        name: toolName,
-        arguments: args,
-      });
+      // Get the tool from client
+      const tools = await mcpClient.tools();
+      const tool = tools[toolName];
 
-      console.log('✓ MCP tool result:', result);
-
-      // Extract content from MCP response
-      if (result.content && Array.isArray(result.content)) {
-        // MCP returns content as array of content items
-        const textContent = result.content
-          .filter((item: any) => item.type === 'text')
-          .map((item: any) => item.text)
-          .join('\n');
-
-        try {
-          // Try to parse as JSON if it looks like JSON
-          return JSON.parse(textContent);
-        } catch {
-          // Return as-is if not JSON
-          return textContent;
-        }
+      if (!tool) {
+        throw new Error(`Tool ${toolName} not found`);
       }
+
+      // Execute the tool (AI SDK pattern)
+      const result = await tool.execute?.(args);
+      console.log('✓ MCP tool result:', result);
 
       return result;
     } catch (error) {
@@ -182,6 +149,7 @@ export function useMcpTools(): UseMcpToolsReturn {
   // Auto-start on mount
   useEffect(() => {
     startHttpClient();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {
