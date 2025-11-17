@@ -67,8 +67,9 @@ export function useMcpTools(): UseMcpToolsReturn {
 
       // Start the MCP server in E2B sandbox (NetGlade pattern)
       console.log('📦 Starting E2B sandbox...');
+      console.log('🔧 Using fetch-mcp (Node.js based MCP server for HTTP requests)');
       const mcpSandbox = await startMcpSandbox({
-        command: 'npx -y @modelcontextprotocol/server-fetch',
+        command: 'npx -y fetch-mcp',
         apiKey,
         envs: {},
         timeoutMs: 1000 * 60 * 5, // 5 minutes like NetGlade
