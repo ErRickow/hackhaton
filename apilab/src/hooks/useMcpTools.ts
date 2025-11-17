@@ -17,31 +17,50 @@ export function useMcpTools(): UseMcpToolsReturn {
 
   /**
    * Wait for MCP server to be ready by polling the URL
-   * NetGlade pattern: retry up to maxAttempts with 6s delay
+   * NetGlade pattern: retry up to maxAttempts with delay
    */
-  async function waitForServerReady(url: string, maxAttempts = 5): Promise<boolean> {
+  async function waitForServerReady(url: string, maxAttempts = 10): Promise<boolean> {
     console.log(`🔍 Testing server readiness at: ${url}`);
+    console.log(`⏱️  Will try ${maxAttempts} times with 8 second delays`);
+
     for (let i = 0; i < maxAttempts; i++) {
       try {
-        console.log(`📡 Attempt ${i + 1}/${maxAttempts}: Fetching ${url}...`);
-        const response = await fetch(url);
-        console.log(`📥 Response status: ${response.status} ${response.statusText}`);
+        console.log(`\n📡 Attempt ${i + 1}/${maxAttempts}: Fetching ${url}...`);
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'Accept': 'text/event-stream' }
+        });
 
-        if (response.status === 200) {
-          console.log(`✅ Server ready at ${url} after ${i + 1} attempts`);
+        console.log(`📥 Response status: ${response.status} ${response.statusText}`);
+        console.log(`📥 Response headers:`, Object.fromEntries(response.headers.entries()));
+
+        if (response.ok) {
+          const contentType = response.headers.get('content-type');
+          console.log(`✅ Server ready! Content-Type: ${contentType}`);
           return true;
         }
-        console.log(`⏳ Server not ready yet (attempt ${i + 1}/${maxAttempts}), status: ${response.status}`);
+
+        // Try to read response body for more info
+        try {
+          const text = await response.text();
+          console.log(`📄 Response body:`, text.substring(0, 200));
+        } catch {
+          console.log(`📄 Could not read response body`);
+        }
+
+        console.log(`⏳ Server not ready yet (attempt ${i + 1}/${maxAttempts})`);
       } catch (err) {
-        console.log(`⏳ Server connection failed (attempt ${i + 1}/${maxAttempts}):`, err instanceof Error ? err.message : String(err));
+        console.log(`⏳ Server connection failed (attempt ${i + 1}/${maxAttempts}):`);
+        console.error(err);
       }
 
       if (i < maxAttempts - 1) {
-        console.log(`⌛ Waiting 6 seconds before next attempt...`);
-        await new Promise(resolve => setTimeout(resolve, 6000));
+        console.log(`⌛ Waiting 8 seconds before next attempt...`);
+        await new Promise(resolve => setTimeout(resolve, 8000));
       }
     }
-    console.log(`❌ Server failed to become ready after ${maxAttempts} attempts`);
+    console.log(`\n❌ Server failed to become ready after ${maxAttempts} attempts`);
+    console.log(`❌ Total time waited: ${maxAttempts * 8} seconds`);
     return false;
   }
 
@@ -52,44 +71,52 @@ export function useMcpTools(): UseMcpToolsReturn {
     setError(null);
 
     try {
-      console.log('🚀 Starting HTTP Client MCP server in E2B sandbox...');
-      console.log('⏱️  This may take 30-60 seconds for first boot...');
+      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🚀 Starting MCP Server in E2B Sandbox');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      console.log('⏱️  This may take 30-90 seconds for first boot...\n');
 
       // Get E2B API key from localStorage
       const stored = window.localStorage.getItem('apilab_api_keys');
       const apiKeys = stored ? JSON.parse(stored) : {};
       const apiKey = apiKeys.e2b;
 
+      console.log('🔑 Checking API keys...');
+      console.log(`   E2B API key: ${apiKey ? '✅ Found (length: ' + apiKey.length + ')' : '❌ Not found'}`);
+
       if (!apiKey) {
         throw new Error('E2B API key not found. Please configure it in Settings.');
       }
 
       // Start the MCP server in E2B sandbox (NetGlade pattern)
-      console.log('📦 Starting E2B sandbox...');
-      console.log('🔧 Using @modelcontextprotocol/server-brave-search (proven NetGlade winner package)');
+      console.log('\n📦 Step 1: Creating E2B sandbox...');
+      console.log('🔧 Using simple weather server for testing');
+      console.log('⏱️  Calling startMcpSandbox...\n');
+
       const mcpSandbox = await startMcpSandbox({
-        command: 'npx -y @modelcontextprotocol/server-brave-search',
+        command: 'npx -y @modelcontextprotocol/server-weather',
         apiKey,
-        envs: {
-          BRAVE_API_KEY: apiKeys.brave || '', // Optional: Brave API key for enhanced search
-        },
-        timeoutMs: 1000 * 60 * 5, // 5 minutes like NetGlade
+        envs: {},
+        timeoutMs: 1000 * 60 * 10, // 10 minutes timeout
       });
 
       const serverUrl = mcpSandbox.getUrl();
-      console.log('✅ MCP sandbox started!');
+      console.log('\n✅ MCP sandbox created successfully!');
       console.log('🔗 Server URL:', serverUrl);
+      console.log('📝 This URL points to the SSE endpoint\n');
 
       // Wait for MCP server to be fully ready (NetGlade pattern)
-      console.log('⏳ Waiting for MCP server to be ready...');
-      const isReady = await waitForServerReady(serverUrl, 5);
+      console.log('📡 Step 2: Waiting for MCP server to be ready...');
+      const isReady = await waitForServerReady(serverUrl, 10);
 
       if (!isReady) {
-        throw new Error('MCP server failed to start within timeout period');
+        throw new Error('MCP server failed to start within timeout period (80 seconds)');
       }
 
       // Create MCP client using AI SDK (NetGlade pattern)
-      console.log('🔌 Creating MCP client with AI SDK...');
+      console.log('\n🔌 Step 3: Creating MCP client with AI SDK...');
+      console.log('📝 Using experimental_createMCPClient with SSE transport\n');
+
       const aiClient = await experimental_createMCPClient({
         transport: {
           type: 'sse',
@@ -97,11 +124,18 @@ export function useMcpTools(): UseMcpToolsReturn {
         },
       });
 
+      console.log('✅ MCP client created successfully!\n');
+
       // Get tools from client (NetGlade pattern)
-      console.log('🔧 Fetching available tools...');
+      console.log('🔧 Step 4: Fetching available tools from MCP server...');
       const mcpTools = await aiClient.tools();
-      console.log('✅ Tools loaded:', Object.keys(mcpTools).length);
-      console.log('📋 Available tools:', Object.keys(mcpTools).join(', '));
+
+      console.log('\n✅ Tools loaded successfully!');
+      console.log(`📊 Total tools: ${Object.keys(mcpTools).length}`);
+      console.log('📋 Available tools:');
+      Object.keys(mcpTools).forEach(toolName => {
+        console.log(`   - ${toolName}`);
+      });
 
       // Store tools in AI SDK format directly (NO conversion!)
       // This is the exact NetGlade pattern
@@ -110,9 +144,13 @@ export function useMcpTools(): UseMcpToolsReturn {
       setIsReady(true);
       setIsStarting(false);
 
-      console.log('✅ MCP server ready with tools:', Object.keys(mcpTools));
+      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('✅ MCP Server Ready!');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     } catch (err) {
-      console.error('❌ Failed to start MCP server:', err);
+      console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('❌ MCP Server Initialization Failed');
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
       console.error('Error details:', {
         name: err instanceof Error ? err.name : 'Unknown',
         message: err instanceof Error ? err.message : String(err),
