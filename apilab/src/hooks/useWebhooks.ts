@@ -1,10 +1,11 @@
 /**
  * useWebhooks Hook
  * Manages webhook receiver MCP server
+ * DISABLED: Webhook feature temporarily disabled during E2B MCP migration
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { startMcpSandbox } from '@netglade/mcp-sandbox';
+// import { startMcpSandbox } from '@netglade/mcp-sandbox';
 
 interface WebhookEvent {
   id: string;
@@ -30,8 +31,8 @@ export interface UseWebhooksReturn {
 }
 
 export function useWebhooks(): UseWebhooksReturn {
-  const [webhookServer, setWebhookServer] = useState<any>(null);
-  const [webhookUrl, setWebhookUrl] = useState<string | null>(null);
+  const [webhookServer, _setWebhookServer] = useState<any>(null);
+  const [webhookUrl, _setWebhookUrl] = useState<string | null>(null);
   const [events, setEvents] = useState<WebhookEvent[]>([]);
   const [isStarting, setIsStarting] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -56,38 +57,30 @@ export function useWebhooks(): UseWebhooksReturn {
       }
 
       // Start the webhook receiver MCP server in E2B sandbox
-      const mcp = await startMcpSandbox({
-        command: 'npx -y @apilab/webhook-receiver-mcp',
-        apiKey,
-      });
+      // DISABLED: Migration to E2B Official Beta MCP in progress
+      throw new Error('Webhook feature temporarily disabled during migration');
 
-      console.log('✓ Webhook MCP server started');
-      console.log('  URL:', mcp.getUrl());
-
-      // Start the webhook server
-      const startResult = await (mcp as any).callTool('start_webhook_server', {
-        port: 3000,
-      });
-
-      const startData = JSON.parse(startResult.content[0].text);
-      console.log('✓ Webhook server initialized:', startData);
-
-      // Get the webhook URL (will be E2B's public URL)
-      // In E2B, the URL will be the sandbox's public URL
-      // We need to construct it from the MCP URL
-      const mcpUrl = mcp.getUrl();
-      const baseUrl = mcpUrl.replace('/sse', ''); // Remove /sse path
-      const webhookPublicUrl = `${baseUrl}:3000/webhook`;
-
-      console.log('✓ Webhook URL ready:', webhookPublicUrl);
-
-      setWebhookServer(mcp);
-      setWebhookUrl(webhookPublicUrl);
-      setIsReady(true);
-      setIsStarting(false);
-
-      console.log('✅ Webhook receiver ready!');
-      console.log('📍 Send webhooks to:', webhookPublicUrl);
+      // const mcp = await startMcpSandbox({
+      //   command: 'npx -y @apilab/webhook-receiver-mcp',
+      //   apiKey,
+      // });
+      // console.log('✓ Webhook MCP server started');
+      // console.log('  URL:', mcp.getUrl());
+      // const startResult = await (mcp as any).callTool('start_webhook_server', {
+      //   port: 3000,
+      // });
+      // const startData = JSON.parse(startResult.content[0].text);
+      // console.log('✓ Webhook server initialized:', startData);
+      // const mcpUrl = mcp.getUrl();
+      // const baseUrl = mcpUrl.replace('/sse', '');
+      // const webhookPublicUrl = `${baseUrl}:3000/webhook`;
+      // console.log('✓ Webhook URL ready:', webhookPublicUrl);
+      // setWebhookServer(mcp);
+      // setWebhookUrl(webhookPublicUrl);
+      // setIsReady(true);
+      // setIsStarting(false);
+      // console.log('✅ Webhook receiver ready!');
+      // console.log('📍 Send webhooks to:', webhookPublicUrl);
     } catch (err) {
       console.error('❌ Failed to start webhook server:', err);
       setError(err instanceof Error ? err : new Error(String(err)));
