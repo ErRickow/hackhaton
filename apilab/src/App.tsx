@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Flask, Send } from 'lucide-react'
+import { Beaker, Send } from 'lucide-react'
 
 function App() {
   return (
@@ -10,7 +10,7 @@ function App() {
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Flask className="h-6 w-6 text-primary" />
+            <Beaker className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold">APILab</h1>
           </div>
           <div className="flex items-center gap-4">
