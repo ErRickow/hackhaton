@@ -10,4 +10,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // GitHub Pages base path
+  // If deploying to https://<username>.github.io/hackhaton/
+  base: process.env.NODE_ENV === 'production' ? '/apilab/' : '/',
 })

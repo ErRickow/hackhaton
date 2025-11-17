@@ -7,10 +7,13 @@
     "dev": "vite",
     "dev:api": "cd api && npm run dev",
     "dev:all": "concurrently \"npm run dev:api\" \"npm run dev\"",
+    "dev:worker": "cd worker && wrangler dev",
     "build": "tsc -b && vite build",
     "build:api": "cd api && npm run build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "gh-pages -d dist",
+    "deploy:worker": "cd worker && wrangler deploy"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.44",
