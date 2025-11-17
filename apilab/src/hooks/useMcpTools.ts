@@ -25,6 +25,7 @@ export function useMcpTools(): UseMcpToolsReturn {
 
     try {
       console.log('🚀 Starting HTTP Client MCP server in E2B sandbox...');
+      console.log('⏱️  This may take 30-60 seconds for first boot...');
 
       // Get E2B API key from localStorage
       const stored = window.localStorage.getItem('apilab_api_keys');
@@ -36,17 +37,24 @@ export function useMcpTools(): UseMcpToolsReturn {
       }
 
       // Start the MCP server in E2B sandbox
-      // Using @sylphlab/tools-fetch-mcp for HTTP requests
+      // Using fetch-mcp (official MCP server for HTTP requests)
+      console.log('📦 Starting E2B sandbox...');
       const mcpSandbox = await startMcpSandbox({
-        command: 'npx -y @sylphlab/tools-fetch-mcp',
+        command: 'npx -y -p @modelcontextprotocol/server-fetch @modelcontextprotocol/server-fetch',
         apiKey,
+        timeoutMs: 1000 * 60 * 15, // 15 minutes timeout
       });
 
-      console.log('✓ MCP sandbox started');
+      console.log('✅ MCP sandbox started successfully!');
       const serverUrl = mcpSandbox.getUrl();
-      console.log('  URL:', serverUrl);
+      console.log('🔗 Server URL:', serverUrl);
+
+      // Wait for MCP server to be fully ready (supergateway + MCP server boot time)
+      console.log('⏳ Waiting for MCP server to initialize...');
+      await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds
 
       // Create MCP client with SSE transport
+      console.log('🔌 Creating MCP client...');
       const client = new Client(
         {
           name: 'apilab-mcp-client',
@@ -58,9 +66,10 @@ export function useMcpTools(): UseMcpToolsReturn {
       );
 
       // Connect to MCP server via SSE
+      console.log('🔌 Connecting to MCP server via SSE...');
       const transport = new SSEClientTransport(new URL(serverUrl));
       await client.connect(transport);
-      console.log('✓ MCP client connected');
+      console.log('✅ MCP client connected successfully!');
 
       // Get available tools from the MCP server
       let availableTools: McpTool[] = [];

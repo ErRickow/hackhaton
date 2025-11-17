@@ -49,13 +49,13 @@ function App() {
               {isStarting && (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin text-yellow-500" />
-                  <span className="text-muted-foreground">Starting...</span>
+                  <span className="text-muted-foreground">Starting MCP Server (30-60s)...</span>
                 </>
               )}
               {isReady && (
                 <>
-                  <div className="h-2 w-2 rounded-full bg-green-500" />
-                  <span className="text-muted-foreground">API Ready</span>
+                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-green-600 dark:text-green-400 font-medium">API Ready</span>
                 </>
               )}
               {webhookStarting && (
@@ -66,8 +66,8 @@ function App() {
               )}
               {webhookReady && (
                 <>
-                  <div className="h-2 w-2 rounded-full bg-blue-500" />
-                  <span className="text-muted-foreground">Webhook Ready</span>
+                  <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                  <span className="text-blue-600 dark:text-blue-400 font-medium">Webhook Ready</span>
                 </>
               )}
             </div>
