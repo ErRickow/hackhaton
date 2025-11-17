@@ -1,21 +1,46 @@
 /**
- * Groq Client
- * Direct client-side Groq API calls for quick prototyping
+ * LLM Client
+ * Multi-provider support: Neosantara AI (OpenAI-compatible) and Groq
  */
 
 import Groq from 'groq-sdk';
 
-export function createGroqClient() {
-  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+export type LLMProvider = 'neosantara' | 'groq';
 
-  if (!apiKey) {
-    throw new Error('Groq API key not found. Please set VITE_GROQ_API_KEY in .env file.');
+export function createLLMClient(provider: LLMProvider = 'neosantara') {
+  if (provider === 'neosantara') {
+    const apiKey = import.meta.env.VITE_NEOSANTARA_API_KEY;
+
+    if (!apiKey) {
+      throw new Error('Neosantara API key not found. Please set VITE_NEOSANTARA_API_KEY in .env file.');
+    }
+
+    // Neosantara is OpenAI-compatible, so we can use Groq SDK with custom baseURL
+    return new Groq({
+      apiKey,
+      baseURL: 'https://api.neosantara.xyz/v1',
+      dangerouslyAllowBrowser: true, // For dev only - move to backend in production!
+    });
+  } else {
+    const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+
+    if (!apiKey) {
+      throw new Error('Groq API key not found. Please set VITE_GROQ_API_KEY in .env file.');
+    }
+
+    return new Groq({
+      apiKey,
+      dangerouslyAllowBrowser: true, // For dev only - move to backend in production!
+    });
   }
+}
 
-  return new Groq({
-    apiKey,
-    dangerouslyAllowBrowser: true, // For dev only - move to backend in production!
-  });
+export function getModelName(provider: LLMProvider = 'neosantara'): string {
+  if (provider === 'neosantara') {
+    return 'nusantara-base'; // Supports function calling
+  } else {
+    return 'llama-3.1-8b-instant'; // Groq model
+  }
 }
 
 export interface ChatMessage {
@@ -48,10 +73,12 @@ export async function streamChatCompletion(
   onChunk: (text: string) => void,
   onComplete: () => void,
   onError: (error: Error) => void,
-  onToolCall?: ToolCallHandler
+  onToolCall?: ToolCallHandler,
+  provider: LLMProvider = 'neosantara'
 ) {
   try {
-    const groq = createGroqClient();
+    const client = createLLMClient(provider);
+    const modelName = getModelName(provider);
 
     // Convert MCP tools to Groq format
     const groqTools = tools.map(tool => ({
@@ -63,7 +90,9 @@ export async function streamChatCompletion(
       },
     }));
 
-    const stream = await groq.chat.completions.create({
+    console.log(`🤖 Using ${provider} with model: ${modelName}`);
+
+    const stream = await client.chat.completions.create({
       messages: messages.map(m => {
         if (m.role === 'tool') {
           return {
@@ -84,7 +113,7 @@ export async function streamChatCompletion(
           };
         }
       }),
-      model: 'llama-3.1-8b-instant',
+      model: modelName,
       temperature: 0.5,
       max_tokens: 1024,
       tools: groqTools.length > 0 ? groqTools : undefined,
@@ -185,14 +214,15 @@ export async function streamChatCompletion(
         onChunk,
         onComplete,
         onError,
-        onToolCall
+        onToolCall,
+        provider
       );
     }
 
     onComplete();
     return fullResponse;
   } catch (error) {
-    console.error('Groq streaming error:', error);
+    console.error(`${provider} streaming error:`, error);
     onError(error instanceof Error ? error : new Error(String(error)));
     throw error;
   }

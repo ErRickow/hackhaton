@@ -118,7 +118,9 @@ Be concise but informative.`;
             console.error('❌ Tool call error:', error);
             throw error;
           }
-        }
+        },
+        // Provider - using Neosantara AI
+        'neosantara'
       );
     } catch (err) {
       console.error('Failed to send message:', err);
