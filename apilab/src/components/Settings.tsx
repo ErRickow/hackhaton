@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Settings as SettingsIcon, Eye, EyeOff, Check, X } from 'lucide-react';
+import { Settings as SettingsIcon, Eye, EyeOff, Check, X, Save, Trash2 } from 'lucide-react';
 import { useApiKeys } from '@/hooks/useLocalStorage';
 
 interface SettingsProps {
@@ -16,35 +16,88 @@ interface SettingsProps {
   onClose: () => void;
 }
 
+type Provider = 'e2b' | 'neosantara' | 'groq';
+
+interface ProviderInfo {
+  name: string;
+  description: string;
+  placeholder: string;
+  url: string;
+  required: boolean;
+}
+
+const PROVIDERS: Record<Provider, ProviderInfo> = {
+  e2b: {
+    name: 'E2B Sandbox',
+    description: 'Required for running MCP servers in browser',
+    placeholder: 'e2b_...',
+    url: 'https://e2b.dev',
+    required: true,
+  },
+  neosantara: {
+    name: 'Neosantara AI',
+    description: 'Indonesian language model with function calling (Primary)',
+    placeholder: 'nsk_...',
+    url: 'https://api.neosantara.xyz',
+    required: false,
+  },
+  groq: {
+    name: 'Groq',
+    description: 'Fast inference with llama-3.1-8b-instant (Alternative)',
+    placeholder: 'gsk_...',
+    url: 'https://console.groq.com',
+    required: false,
+  },
+};
+
 export function Settings({ isOpen, onClose }: SettingsProps) {
-  const { apiKeys, updateKey, hasE2bKey, hasLLMKey } = useApiKeys();
+  const { apiKeys, updateKey, isConfigured } = useApiKeys();
+  const [selectedProvider, setSelectedProvider] = useState<Provider>('e2b');
+  const [inputValue, setInputValue] = useState('');
   const [showKeys, setShowKeys] = useState(false);
-  const [tempKeys, setTempKeys] = useState(apiKeys);
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleSave = () => {
-    updateKey('e2b', tempKeys.e2b);
-    updateKey('neosantara', tempKeys.neosantara);
-    updateKey('groq', tempKeys.groq);
+    if (!inputValue.trim()) {
+      return;
+    }
+
+    updateKey(selectedProvider, inputValue.trim());
+    setSavedMessage(`${PROVIDERS[selectedProvider].name} API key saved!`);
+    setInputValue('');
+
+    // Clear success message after 2 seconds
+    setTimeout(() => setSavedMessage(null), 2000);
+  };
+
+  const handleDelete = (provider: Provider) => {
+    updateKey(provider, '');
+    setSavedMessage(`${PROVIDERS[provider].name} API key deleted!`);
+    setTimeout(() => setSavedMessage(null), 2000);
+  };
+
+  const handleClose = () => {
+    if (!isConfigured) {
+      alert('⚠️ Please configure at least E2B API key and one LLM provider (Neosantara or Groq) before closing.');
+      return;
+    }
     onClose();
   };
 
-  const handleCancel = () => {
-    setTempKeys(apiKeys);
-    onClose();
-  };
+  const currentProviderInfo = PROVIDERS[selectedProvider];
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 shadow-2xl">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
+      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+        <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <SettingsIcon className="h-5 w-5" />
-              <CardTitle>Settings</CardTitle>
+              <CardTitle>API Key Configuration</CardTitle>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleCancel}>
+            <Button variant="ghost" size="sm" onClick={handleClose}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -52,162 +105,209 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
             Configure your API keys. All keys are stored locally in your browser.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6 bg-white dark:bg-gray-900 p-6">
-          {/* E2B API Key */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">
-                E2B API Key <span className="text-destructive">*</span>
-              </label>
-              <div className="flex items-center gap-2">
-                {hasE2bKey ? (
-                  <Badge variant="default" className="bg-green-500">
-                    <Check className="h-3 w-3 mr-1" />
-                    Configured
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-yellow-600">
-                    Required
-                  </Badge>
-                )}
-              </div>
-            </div>
-            <Input
-              type={showKeys ? 'text' : 'password'}
-              value={tempKeys.e2b}
-              onChange={(e) => setTempKeys({ ...tempKeys, e2b: e.target.value })}
-              placeholder="e2b_..."
-              className="font-mono text-sm bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400"
-            />
-            <p className="text-xs text-muted-foreground">
-              Get your key from:{' '}
-              <a
-                href="https://e2b.dev"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                https://e2b.dev
-              </a>
-            </p>
-          </div>
 
-          {/* Neosantara AI Key */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">
-                Neosantara AI API Key (Primary LLM)
-              </label>
-              <div className="flex items-center gap-2">
-                {tempKeys.neosantara ? (
-                  <Badge variant="default" className="bg-green-500">
-                    <Check className="h-3 w-3 mr-1" />
-                    Configured
-                  </Badge>
-                ) : (
-                  <Badge variant="outline">Optional</Badge>
-                )}
-              </div>
+        <CardContent className="space-y-6">
+          {/* Success Message */}
+          {savedMessage && (
+            <div className="p-3 bg-green-100 dark:bg-green-900/30 border-2 border-green-500 dark:border-green-700 rounded-lg">
+              <p className="text-sm font-medium text-green-900 dark:text-green-100 flex items-center gap-2">
+                <Check className="h-4 w-4" />
+                {savedMessage}
+              </p>
             </div>
-            <Input
-              type={showKeys ? 'text' : 'password'}
-              value={tempKeys.neosantara}
-              onChange={(e) => setTempKeys({ ...tempKeys, neosantara: e.target.value })}
-              placeholder="nsk_..."
-              className="font-mono text-sm bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400"
-            />
-            <p className="text-xs text-muted-foreground">
-              Indonesian language model with function calling support
-              <br />
-              Get your key from:{' '}
-              <a
-                href="https://api.neosantara.xyz"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                https://api.neosantara.xyz
-              </a>
-            </p>
-          </div>
+          )}
 
-          {/* Groq API Key */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
+          {/* Add API Key Section */}
+          <div className="space-y-4 p-4 border-2 rounded-lg">
+            <h3 className="font-semibold text-sm">Add/Update API Key</h3>
+
+            {/* Provider Selection */}
+            <div className="space-y-2">
               <label className="text-sm font-medium">
-                Groq API Key (Alternative LLM)
+                Select Provider {currentProviderInfo.required && <span className="text-destructive">*</span>}
               </label>
-              <div className="flex items-center gap-2">
-                {tempKeys.groq ? (
-                  <Badge variant="default" className="bg-green-500">
-                    <Check className="h-3 w-3 mr-1" />
-                    Configured
-                  </Badge>
-                ) : (
-                  <Badge variant="outline">Optional</Badge>
-                )}
-              </div>
-            </div>
-            <Input
-              type={showKeys ? 'text' : 'password'}
-              value={tempKeys.groq}
-              onChange={(e) => setTempKeys({ ...tempKeys, groq: e.target.value })}
-              placeholder="gsk_..."
-              className="font-mono text-sm bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400"
-            />
-            <p className="text-xs text-muted-foreground">
-              Fast inference with llama-3.1-8b-instant
-              <br />
-              Get your key from:{' '}
-              <a
-                href="https://console.groq.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
+              <select
+                value={selectedProvider}
+                onChange={(e) => {
+                  setSelectedProvider(e.target.value as Provider);
+                  setInputValue('');
+                }}
+                className="w-full px-3 py-2 border-2 rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                https://console.groq.com
-              </a>
-            </p>
-          </div>
+                <option value="e2b">E2B Sandbox (Required)</option>
+                <option value="neosantara">Neosantara AI (Primary LLM)</option>
+                <option value="groq">Groq (Alternative LLM)</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                {currentProviderInfo.description}
+              </p>
+            </div>
 
-          {/* Show/Hide Keys Toggle */}
-          <div className="flex items-center justify-between pt-4 border-t-2 border-gray-200 dark:border-gray-700">
+            {/* API Key Input */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">API Key</label>
+              <div className="flex gap-2">
+                <Input
+                  type={showKeys ? 'text' : 'password'}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder={currentProviderInfo.placeholder}
+                  className="font-mono text-sm flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSave();
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowKeys(!showKeys)}
+                  title={showKeys ? 'Hide' : 'Show'}
+                >
+                  {showKeys ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Get your key from:{' '}
+                <a
+                  href={currentProviderInfo.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  {currentProviderInfo.url}
+                </a>
+              </p>
+            </div>
+
+            {/* Save Button */}
             <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowKeys(!showKeys)}
+              onClick={handleSave}
+              disabled={!inputValue.trim()}
+              className="w-full"
             >
-              {showKeys ? (
-                <>
-                  <EyeOff className="h-4 w-4 mr-2" />
-                  Hide Keys
-                </>
-              ) : (
-                <>
-                  <Eye className="h-4 w-4 mr-2" />
-                  Show Keys
-                </>
-              )}
+              <Save className="h-4 w-4 mr-2" />
+              Save {PROVIDERS[selectedProvider].name} Key
             </Button>
+          </div>
 
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleCancel}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave} disabled={!tempKeys.e2b || (!tempKeys.neosantara && !tempKeys.groq)}>
-                Save Changes
-              </Button>
+          {/* Current Keys Status */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-sm">Configured API Keys</h3>
+
+            {/* E2B Status */}
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <div>
+                  <p className="font-medium text-sm">E2B Sandbox</p>
+                  <p className="text-xs text-muted-foreground">Required</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {apiKeys.e2b ? (
+                  <>
+                    <Badge variant="default" className="bg-green-500">
+                      <Check className="h-3 w-3 mr-1" />
+                      Configured
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete('e2b')}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+                    Not Configured
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {/* Neosantara Status */}
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <div>
+                  <p className="font-medium text-sm">Neosantara AI</p>
+                  <p className="text-xs text-muted-foreground">Primary LLM</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {apiKeys.neosantara ? (
+                  <>
+                    <Badge variant="default" className="bg-green-500">
+                      <Check className="h-3 w-3 mr-1" />
+                      Configured
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete('neosantara')}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <Badge variant="outline">Optional</Badge>
+                )}
+              </div>
+            </div>
+
+            {/* Groq Status */}
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <div>
+                  <p className="font-medium text-sm">Groq</p>
+                  <p className="text-xs text-muted-foreground">Alternative LLM</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {apiKeys.groq ? (
+                  <>
+                    <Badge variant="default" className="bg-green-500">
+                      <Check className="h-3 w-3 mr-1" />
+                      Configured
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete('groq')}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <Badge variant="outline">Optional</Badge>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Warning */}
-          {(!hasE2bKey || !hasLLMKey) && (
-            <div className="p-4 bg-yellow-100 dark:bg-yellow-900/50 border-2 border-yellow-400 dark:border-yellow-600 rounded-lg">
+          {!isConfigured && (
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-lg">
               <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
                 ⚠️ <strong>Required:</strong> You need at least E2B API key and one LLM provider (Neosantara or Groq) to use APILab.
               </p>
             </div>
           )}
+
+          {/* Close Button */}
+          <div className="pt-4 border-t">
+            <Button
+              onClick={handleClose}
+              variant="outline"
+              className="w-full"
+            >
+              Close Settings
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
