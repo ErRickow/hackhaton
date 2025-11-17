@@ -180,13 +180,17 @@ export function useMcpTools(): UseMcpToolsReturn {
         } catch {
           errorData = { error: errorText };
         }
-        console.error('❌ Backend API Error:', {
-          status: initResponse.status,
-          statusText: initResponse.statusText,
-          error: errorData,
-          url: `${backendUrl}/api/mcp/init`
-        });
-        throw new Error(`Backend API error (${initResponse.status}): ${errorData.error || initResponse.statusText}`);
+
+        // Create error with all debug info attached
+        const error = new Error(`Backend API error (${initResponse.status}): ${errorData.error || initResponse.statusText}`) as any;
+        error.status = initResponse.status;
+        error.statusText = initResponse.statusText;
+        error.url = `${backendUrl}/api/mcp/init`;
+        error.responseBody = errorData;
+        error.rawResponse = errorText;
+
+        console.error('❌ Backend API Error:', error);
+        throw error;
       }
 
       const { sandboxId, mcpUrl, mcpToken } = await initResponse.json();
@@ -201,7 +205,11 @@ export function useMcpTools(): UseMcpToolsReturn {
       const isGatewayReady = await waitForServerReady(mcpUrl, mcpToken, 10);
 
       if (!isGatewayReady) {
-        throw new Error('MCP gateway failed to start within timeout period');
+        const error = new Error('MCP gateway failed to start within timeout period') as any;
+        error.mcpUrl = mcpUrl;
+        error.attempts = 10;
+        error.timeoutSeconds = 50; // 10 attempts * 5 seconds
+        throw error;
       }
 
       // Create MCP client with authentication (BROWSER-COMPATIBLE!)
@@ -251,19 +259,24 @@ export function useMcpTools(): UseMcpToolsReturn {
       console.error('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.error('❌ MCP Gateway Initialization Failed');
       console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-      console.error('Error details:', {
-        name: err instanceof Error ? err.name : 'Unknown',
-        message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-      });
+      console.error('Error details:', err);
 
-      const error = err instanceof Error ? err : new Error(String(err));
+      // Preserve all error properties for debugging
+      let error: any;
+      if (err instanceof Error) {
+        error = err;
+      } else {
+        error = new Error(String(err));
+        error.originalError = err;
+      }
+
+      // Ensure all custom properties are preserved
       setError(error);
       setIsStarting(false);
       setIsReady(false);
 
       // Make sure error is visible
-      console.error('🔴 ERROR OBJECT:', error);
+      console.error('🔴 FULL ERROR OBJECT:', error);
     }
   };
 

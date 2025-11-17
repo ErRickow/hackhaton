@@ -68,13 +68,22 @@ function App() {
       {/* Messages Area - Full Screen */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-3xl mx-auto">
-          {/* Error Display */}
+          {/* Error Display - Raw Debug Format */}
           {showError && (
-            <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-destructive">Error</p>
-                <p className="text-xs text-destructive/90">{showError.message}</p>
+            <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+              <div className="flex items-start gap-2 mb-2">
+                <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                <p className="text-sm font-medium text-destructive">Error (Raw Debug Info)</p>
+              </div>
+              <div className="bg-black/5 dark:bg-black/20 rounded p-2 overflow-x-auto max-h-96 overflow-y-auto">
+                <pre className="text-xs font-mono text-destructive whitespace-pre-wrap break-all">
+                  {JSON.stringify({
+                    message: showError.message,
+                    name: showError.name,
+                    stack: showError.stack,
+                    ...showError
+                  }, null, 2)}
+                </pre>
               </div>
             </div>
           )}
