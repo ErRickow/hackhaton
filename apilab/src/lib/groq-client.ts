@@ -87,11 +87,11 @@ export interface ToolCallHandler {
 
 export async function streamChatCompletion(
   messages: ChatMessage[],
-  tools: McpTool[],
+  tools: any, // AI SDK tools format (from client.tools())
   onChunk: (text: string) => void,
   onComplete: () => void,
   onError: (error: Error) => void,
-  onToolCall?: ToolCallHandler,
+  _onToolCall?: ToolCallHandler,
   provider: LLMProvider = 'neosantara'
 ) {
   try {
@@ -101,22 +101,7 @@ export async function streamChatCompletion(
     console.log(`🤖 Using ${provider} with model: ${modelName}`);
     console.log(`🔗 Endpoint: ${provider === 'neosantara' ? 'https://api.neosantara.xyz/v1/chat/completions' : 'https://api.groq.com/openai/v1/chat/completions'}`);
     console.log(`✓ Using Chat Completions API (not Responses API)`);
-
-    // Convert MCP tools to AI SDK format
-    const aiTools: Record<string, any> = {};
-    tools.forEach(tool => {
-      aiTools[tool.name] = {
-        description: tool.description,
-        parameters: tool.inputSchema,
-        execute: async (args: Record<string, any>) => {
-          if (onToolCall) {
-            console.log(`🔧 Executing tool: ${tool.name}`, args);
-            return await onToolCall(tool.name, args);
-          }
-          return null;
-        },
-      };
-    });
+    console.log(`🔧 Tools available: ${Object.keys(tools || {}).join(', ')}`);
 
     // Format messages for AI SDK
     const formattedMessages = messages
@@ -126,12 +111,12 @@ export async function streamChatCompletion(
         content: m.content,
       }));
 
+    // Pass tools directly (NetGlade pattern - NO conversion!)
     const result = streamText({
-      model: llmProvider(modelName), // Use standard model call for v4
+      model: llmProvider(modelName),
       messages: formattedMessages,
-      tools: Object.keys(aiTools).length > 0 ? aiTools : undefined,
-      temperature: 0.5,
-      maxSteps: 10, // Allow multiple tool call rounds
+      tools: tools || {}, // Pass AI SDK tools directly!
+      maxSteps: 20, // Allow multiple tool call rounds (NetGlade uses 20)
       onChunk: ({ chunk }) => {
         if (chunk.type === 'text-delta') {
           onChunk(chunk.textDelta);

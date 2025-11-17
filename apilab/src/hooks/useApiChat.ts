@@ -58,33 +58,19 @@ export function useApiChat(): UseApiChatReturn {
     setMessages(newMessages);
 
     // Create system prompt with tool info
-    const systemPrompt = `You are an API testing assistant. You can help users test APIs by making HTTP requests.
+    const toolList = Object.entries(tools || {})
+      .map(([name, tool]: [string, any]) => `- ${name}: ${tool.description || 'No description'}`)
+      .join('\n');
+
+    const systemPrompt = `You are an API testing assistant. You can help users test web searches and information retrieval.
 
 Available tools:
-${tools.map(t => `- ${t.name}: ${t.description}`).join('\n')}
+${toolList}
 
-When a user asks to test an API:
-1. Extract the URL, method, headers, and any data needed
-2. Use the available tools to make the HTTP request
-3. After receiving the tool result, format it as a JSON code block like this:
-
-\`\`\`json
-{
-  "url": "https://api.example.com/endpoint",
-  "method": "GET",
-  "status": 200,
-  "statusText": "OK",
-  "headers": {
-    "content-type": "application/json"
-  },
-  "body": { "result": "data here" },
-  "duration": 123
-}
-\`\`\`
-
-4. Then provide a brief, helpful explanation of the response
-
-IMPORTANT: Always use the tools to make real HTTP requests. Format the actual response from the tool as JSON above.
+When a user asks you to search or find information:
+1. Use the available tools to get the information
+2. Present the results in a clear, organized way
+3. Provide helpful context and explanations
 
 Be concise but informative.`;
 

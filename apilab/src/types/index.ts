@@ -65,7 +65,7 @@ export interface ChatMessage {
 export interface UseMcpToolsReturn {
   isStarting: boolean;
   isReady: boolean;
-  tools: McpTool[];
+  tools: any; // AI SDK tools format (Record<string, any>)
   error: Error | null;
   startHttpClient: () => Promise<void>;
   mcpServer: McpServer | null;

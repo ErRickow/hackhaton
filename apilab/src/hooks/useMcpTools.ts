@@ -6,12 +6,11 @@
 import { useState, useEffect } from 'react';
 import { startMcpSandbox } from '@netglade/mcp-sandbox';
 import { experimental_createMCPClient } from 'ai';
-import type { UseMcpToolsReturn, McpTool, McpServer } from '@/types';
+import type { UseMcpToolsReturn,  McpServer } from '@/types';
 
 export function useMcpTools(): UseMcpToolsReturn {
   const [mcpServer, setMcpServer] = useState<McpServer | null>(null);
-  const [mcpClient, setMcpClient] = useState<any>(null);
-  const [tools, setTools] = useState<McpTool[]>([]);
+  const [tools, setTools] = useState<any>({}); // Store AI SDK tools format directly!
   const [isStarting, setIsStarting] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -102,26 +101,16 @@ export function useMcpTools(): UseMcpToolsReturn {
       console.log('🔧 Fetching available tools...');
       const mcpTools = await aiClient.tools();
       console.log('✅ Tools loaded:', Object.keys(mcpTools).length);
+      console.log('📋 Available tools:', Object.keys(mcpTools).join(', '));
 
-      // Convert AI SDK tools format to our format
-      const availableTools: McpTool[] = Object.entries(mcpTools).map(([name, tool]: [string, any]) => ({
-        name,
-        description: tool.description || '',
-        inputSchema: tool.parameters || {
-          type: 'object',
-          properties: {},
-        },
-      }));
-
-      console.log('📋 Available tools:', availableTools.map(t => t.name).join(', '));
-
+      // Store tools in AI SDK format directly (NO conversion!)
+      // This is the exact NetGlade pattern
       setMcpServer(mcpSandbox as any);
-      setMcpClient(aiClient);
-      setTools(availableTools);
+      setTools(mcpTools); // Store as-is!
       setIsReady(true);
       setIsStarting(false);
 
-      console.log('✅ HTTP Client MCP ready!');
+      console.log('✅ MCP server ready with tools:', Object.keys(mcpTools));
     } catch (err) {
       console.error('❌ Failed to start MCP server:', err);
       console.error('Error details:', {
@@ -136,19 +125,17 @@ export function useMcpTools(): UseMcpToolsReturn {
   };
 
   const callTool = async (toolName: string, args: Record<string, any>) => {
-    if (!mcpClient) {
-      throw new Error('MCP client not initialized');
+    if (!tools || Object.keys(tools).length === 0) {
+      throw new Error('MCP tools not initialized');
     }
 
     try {
       console.log(`🔧 Calling MCP tool: ${toolName}`, args);
 
-      // Get the tool from client
-      const tools = await mcpClient.tools();
       const tool = tools[toolName];
 
       if (!tool) {
-        throw new Error(`Tool ${toolName} not found`);
+        throw new Error(`Tool ${toolName} not found. Available: ${Object.keys(tools).join(', ')}`);
       }
 
       // Execute the tool (AI SDK pattern)
