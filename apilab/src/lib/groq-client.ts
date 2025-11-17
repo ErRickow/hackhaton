@@ -84,9 +84,9 @@ export async function streamChatCompletion(
           };
         }
       }),
-      model: 'llama-3.3-70b-versatile',
-      temperature: 0.7,
-      max_tokens: 2048,
+      model: 'llama-3.1-8b-instant',
+      temperature: 0.5,
+      max_tokens: 1024,
       tools: groqTools.length > 0 ? groqTools : undefined,
       stream: true,
     });
