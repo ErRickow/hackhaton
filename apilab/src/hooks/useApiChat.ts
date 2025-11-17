@@ -52,8 +52,26 @@ ${tools.map(t => `- ${t.name}: ${t.description}`).join('\n')}
 
 When a user asks to test an API:
 1. Extract the URL, method, headers, and any data needed
-2. Make the appropriate HTTP request
-3. Explain the response in a clear, helpful way
+2. Use the available tools to make the HTTP request
+3. After receiving the tool result, format it as a JSON code block like this:
+
+\`\`\`json
+{
+  "url": "https://api.example.com/endpoint",
+  "method": "GET",
+  "status": 200,
+  "statusText": "OK",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": { "result": "data here" },
+  "duration": 123
+}
+\`\`\`
+
+4. Then provide a brief, helpful explanation of the response
+
+IMPORTANT: Always use the tools to make real HTTP requests. Format the actual response from the tool as JSON above.
 
 Be concise but informative.`;
 
