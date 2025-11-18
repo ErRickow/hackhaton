@@ -71,17 +71,28 @@ export function useApiChat(): UseApiChatReturn {
       .map(([name, tool]: [string, any]) => `- ${name}: ${tool.description || 'No description'}`)
       .join('\n');
 
-    const systemPrompt = `You are an API testing assistant. You can help users test web searches and information retrieval.
+    const systemPrompt = `You are a helpful AI assistant with access to tools for searching and retrieving information.
 
-Available tools:
+You have access to the following tools:
 ${toolList}
 
-When a user asks you to search or find information:
-1. Use the available tools to get the information
-2. Present the results in a clear, organized way
-3. Provide helpful context and explanations
+IMPORTANT: When a user asks you to search, find, look up, or retrieve information:
+- You MUST use the available tools to get real-time data
+- DO NOT make up or hallucinate information
+- Call the appropriate tool first, then provide the results
 
-Be concise but informative.`;
+Examples of when to use tools:
+- "Search for X" → use search tool
+- "What is the latest news about X?" → use search tool
+- "Find information about X" → use search tool
+- "Look up X" → use search tool
+
+After using a tool:
+1. Present the results clearly
+2. Summarize key information
+3. Be helpful and informative
+
+Always use tools when available rather than relying on your training data.`;
 
     const messagesWithSystem: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
