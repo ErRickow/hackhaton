@@ -153,12 +153,13 @@ export default {
       try {
         console.log('📋 Listing MCP tools for sandbox:', sandboxId);
 
-        // Fetch tools directly from MCP gateway using HTTP
-        const mcpResponse = await fetch(`${cached.mcpUrl}/tools/list`, {
+        // Fetch tools directly from MCP gateway using JSON-RPC over HTTP
+        const mcpResponse = await fetch(cached.mcpUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${cached.mcpToken}`,
+            'Accept': 'application/json, text/event-stream',
           },
           body: JSON.stringify({
             jsonrpc: '2.0',
@@ -209,12 +210,13 @@ export default {
 
         console.log(`🔧 Calling tool: ${toolName}`, args);
 
-        // Call tool directly via MCP gateway using HTTP
-        const mcpResponse = await fetch(`${cached.mcpUrl}/tools/call`, {
+        // Call tool directly via MCP gateway using JSON-RPC over HTTP
+        const mcpResponse = await fetch(cached.mcpUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${cached.mcpToken}`,
+            'Accept': 'application/json, text/event-stream',
           },
           body: JSON.stringify({
             jsonrpc: '2.0',
