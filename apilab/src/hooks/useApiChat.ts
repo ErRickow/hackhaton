@@ -5,9 +5,10 @@
 
 import { useState, useRef } from 'react';
 import { useMcpTools } from './useMcpTools';
-import { streamChatCompletion, type ChatMessage } from '@/lib/groq-client';
+import { streamChatCompletion, type ChatMessage, type LLMProvider } from '@/lib/groq-client';
 import type { UseApiChatReturn } from '@/types';
 import type { ToolStatus } from '@/components/ToolExecutionCard';
+import { useApiKeys } from './useLocalStorage';
 
 export interface ToolExecution {
   id: string;
@@ -22,12 +23,20 @@ export interface ToolExecution {
 
 export function useApiChat(): UseApiChatReturn {
   const { isReady, tools, callTool } = useMcpTools();
+  const { apiKeys } = useApiKeys();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [toolExecutions, setToolExecutions] = useState<ToolExecution[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Auto-detect available provider
+  const getAvailableProvider = (): LLMProvider => {
+    if (apiKeys.neosantara) return 'neosantara';
+    if (apiKeys.groq) return 'groq';
+    throw new Error('No LLM provider configured. Please add Neosantara or Groq API key in Settings.');
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
@@ -87,7 +96,7 @@ Be concise but informative.`;
       await streamChatCompletion(
         messagesWithSystem,
         tools, // Pass the MCP tools
-        // On each chunk
+        // On each text chunk
         (chunk) => {
           assistantMessage += chunk;
           setMessages([
@@ -106,60 +115,113 @@ Be concise but informative.`;
           setError(err);
           setIsLoading(false);
         },
-        // Tool call handler
-        async (toolName: string, args: Record<string, any>) => {
-          console.log('🔧 Tool call requested:', toolName, args);
+        // On tool call start
+        (toolCallId: string, toolName: string, args: Record<string, any>) => {
+          console.log('🔧 Tool call started:', toolName, args);
 
-          const executionId = `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          const startTime = Date.now();
-
-          // Add pending execution
           const newExecution: ToolExecution = {
-            id: executionId,
+            id: toolCallId,
             toolName,
             status: 'running',
             args,
-            startTime,
+            startTime: Date.now(),
           };
           setToolExecutions(prev => [...prev, newExecution]);
-
-          try {
-            const result = await callTool(toolName, args);
-            console.log('✓ Tool call result:', result);
-
-            // Update to complete
-            setToolExecutions(prev =>
-              prev.map(exec =>
-                exec.id === executionId
-                  ? { ...exec, status: 'complete', result, endTime: Date.now() }
-                  : exec
-              )
-            );
-
-            return result;
-          } catch (error) {
-            console.error('❌ Tool call error:', error);
-
-            // Update to error
-            setToolExecutions(prev =>
-              prev.map(exec =>
-                exec.id === executionId
-                  ? { ...exec, status: 'error', error: String(error), endTime: Date.now() }
-                  : exec
-              )
-            );
-
-            throw error;
-          }
         },
-        // Provider - using Neosantara AI
-        'neosantara'
+        // On tool call complete
+        (toolCallId: string, toolName: string, result: any) => {
+          console.log('✅ Tool call completed:', toolName);
+
+          // Check if result contains error
+          const isError = result?.isError || result?.error;
+          const status: ToolStatus = isError ? 'error' : 'complete';
+
+          setToolExecutions(prev =>
+            prev.map(exec =>
+              exec.id === toolCallId
+                ? {
+                    ...exec,
+                    status,
+                    result: isError ? undefined : result,
+                    error: isError ? (result?.error || JSON.stringify(result)) : undefined,
+                    endTime: Date.now()
+                  }
+                : exec
+            )
+          );
+        },
+        // Provider - Auto-detect available provider
+        getAvailableProvider()
       );
     } catch (err) {
       console.error('Failed to send message:', err);
-      setError(err instanceof Error ? err : new Error(String(err)));
-      setIsLoading(false);
 
+      // If Neosantara fails and Groq is available, try fallback
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (errorMessage.includes('Neosantara') && apiKeys.groq && apiKeys.neosantara) {
+        console.log('⚠️ Neosantara failed, attempting fallback to Groq...');
+        try {
+          // Retry with Groq
+          let assistantMessage2 = '';
+          setMessages([...newMessages, { role: 'assistant', content: '' }]);
+
+          await streamChatCompletion(
+            messagesWithSystem,
+            tools,
+            (chunk) => {
+              assistantMessage2 += chunk;
+              setMessages([
+                ...newMessages,
+                { role: 'assistant', content: assistantMessage2 },
+              ]);
+            },
+            () => {
+              console.log('✓ Response complete (via Groq)');
+              setIsLoading(false);
+            },
+            (err2) => {
+              console.error('Groq fallback error:', err2);
+              setError(err2);
+              setIsLoading(false);
+            },
+            (toolCallId, toolName, args) => {
+              const newExecution: ToolExecution = {
+                id: toolCallId,
+                toolName,
+                status: 'running',
+                args,
+                startTime: Date.now(),
+              };
+              setToolExecutions(prev => [...prev, newExecution]);
+            },
+            (toolCallId, _toolName, result) => {
+              const isError = result?.isError || result?.error;
+              setToolExecutions(prev =>
+                prev.map(exec =>
+                  exec.id === toolCallId
+                    ? {
+                        ...exec,
+                        status: isError ? 'error' : 'complete',
+                        result: isError ? undefined : result,
+                        error: isError ? (result?.error || JSON.stringify(result)) : undefined,
+                        endTime: Date.now()
+                      }
+                    : exec
+                )
+              );
+            },
+            'groq'
+          );
+          return; // Success with fallback
+        } catch (err2) {
+          console.error('Groq fallback also failed:', err2);
+          setError(new Error(`Both Neosantara and Groq failed. Neosantara: ${errorMessage}. Groq: ${err2 instanceof Error ? err2.message : String(err2)}`));
+        }
+      } else {
+        setError(err instanceof Error ? err : new Error(String(err)));
+      }
+
+      setIsLoading(false);
       // Remove empty assistant message on error
       setMessages(newMessages);
     }
