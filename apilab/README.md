@@ -15,14 +15,15 @@ AI-powered API testing tool - like Postman, but with natural language. Built wit
 APILab uses a **backend proxy architecture** to run MCP servers securely:
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   Frontend  │────▶│   Backend    │────▶│  E2B MCP    │
-│  (Browser)  │     │  (Node.js)   │     │  Sandbox    │
-└─────────────┘     └──────────────┘     └─────────────┘
+┌─────────────┐     ┌──────────────────┐     ┌─────────────┐
+│   Frontend  │────▶│     Backend      │────▶│  E2B MCP    │
+│  (Browser)  │     │ (Cloudflare      │     │  Sandbox    │
+│             │     │   Worker)        │     │             │
+└─────────────┘     └──────────────────┘     └─────────────┘
 ```
 
 - **Frontend**: React + Vite + Vercel AI SDK
-- **Backend**: Node.js server that proxies MCP requests
+- **Backend**: Cloudflare Worker that proxies MCP requests via JSON-RPC over HTTP
 - **E2B Sandbox**: Secure sandbox running MCP servers (DuckDuckGo, ArXiv, etc.)
 
 ## Quick Start
@@ -42,15 +43,15 @@ APILab uses a **backend proxy architecture** to run MCP servers securely:
 git clone <repo-url>
 cd apilab
 npm install
-cd api && npm install && cd ..
+cd worker && pnpm install && cd ..
 ```
 
-2. **Start the backend server**:
+2. **Start the backend worker**:
 ```bash
-npm run dev:api
+npm run dev:worker
 ```
 
-The backend will start on `http://localhost:3001` with these endpoints:
+The Cloudflare Worker will start on `http://localhost:8787` with these endpoints:
 - `POST /api/mcp/init` - Create E2B sandbox
 - `GET /api/mcp/tools/:sandboxId` - List available tools
 - `POST /api/mcp/call/:sandboxId` - Execute tool
@@ -68,25 +69,24 @@ The frontend will start on `http://localhost:5173`
    - Open the app in your browser
    - Click the Settings (⚙️) button
    - Add your API keys:
-     - **Backend API URL**: `http://localhost:3001` (auto-filled)
+     - **Backend API URL**: `http://localhost:8787` (auto-filled)
      - **E2B API Key**: Your E2B sandbox key
      - **Neosantara AI** or **Groq**: Your LLM provider key
 
 ### Development Scripts
 
 ```bash
-# Run both frontend and backend concurrently
-npm run dev:all
-
 # Run only frontend
 npm run dev
 
-# Run only backend
-npm run dev:api
+# Run only backend (Cloudflare Worker)
+npm run dev:worker
 
 # Build for production
 npm run build
-npm run build:api
+
+# Deploy worker to Cloudflare
+npm run deploy:worker
 ```
 
 ## Usage Examples
@@ -159,8 +159,9 @@ apilab/
 │   ├── lib/           # Core libraries
 │   │   └── groq-client.ts     # AI SDK wrapper
 │   └── App.tsx        # Main app component
-├── api/
-│   ├── index.ts       # Backend Node.js server
+├── worker/
+│   ├── index.ts       # Cloudflare Worker backend
+│   ├── wrangler.toml  # Wrangler configuration
 │   └── package.json
 └── package.json       # Frontend dependencies
 ```
@@ -171,12 +172,18 @@ apilab/
 
 **Problem**: Frontend can't connect to backend.
 
-**Solution**: Make sure the backend server is running:
+**Solution**: Make sure the Cloudflare Worker is running:
 ```bash
-npm run dev:api
+cd worker
+pnpm wrangler dev --port 8787
 ```
 
-Check that `http://localhost:3001/health` returns `{"status": "ok"}`.
+Or from root:
+```bash
+npm run dev:worker
+```
+
+Check that `http://localhost:8787/health` returns `{"status": "ok"}`.
 
 ### "E2B API key not found"
 
