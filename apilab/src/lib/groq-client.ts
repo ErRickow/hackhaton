@@ -121,48 +121,67 @@ export async function streamChatCompletion(
     // Track tool calls
     const toolCallsMap = new Map<string, { name: string; args: any }>();
 
-    // Pass tools directly (NetGlade pattern - NO conversion!)
-    await streamText({
+    // Start streaming (returns stream object, not promise)
+    const result = streamText({
       model: llmProvider(modelName),
       messages: formattedMessages,
       tools: tools || {}, // Pass AI SDK tools directly!
       maxSteps: 20, // Allow multiple tool call rounds (NetGlade uses 20)
       abortSignal: AbortSignal.timeout(120000), // 2 minute timeout
-      onChunk: ({ chunk }) => {
-        // Handle different chunk types
-        if (chunk.type === 'text-delta') {
-          onChunk(chunk.textDelta);
-        } else if (chunk.type === 'tool-call') {
-          // Tool call started
-          const toolCallId = chunk.toolCallId;
-          const toolName = chunk.toolName;
-          const args = chunk.args;
-
-          toolCallsMap.set(toolCallId, { name: toolName, args });
-
-          console.log(`🔧 Tool call started: ${toolName}`, args);
-          onToolCallStart?.(toolCallId, toolName, args);
-        } else if (chunk.type === 'tool-result') {
-          // Tool call completed
-          const toolCallId = chunk.toolCallId;
-          const result = chunk.result;
-          const toolCall = toolCallsMap.get(toolCallId);
-
-          if (toolCall) {
-            console.log(`✅ Tool call completed: ${toolCall.name}`);
-            onToolCallComplete?.(toolCallId, toolCall.name, result);
-          }
-        }
-      },
-      onFinish: ({ text, toolCalls, toolResults, finishReason }) => {
-        console.log('✓ Stream finished');
-        console.log(`  Finish reason: ${finishReason}`);
-        console.log(`  Total tool calls: ${toolCalls?.length || 0}`);
-        console.log(`  Final text length: ${text?.length || 0} chars`);
-
-        onComplete();
-      },
     });
+
+    // IMPORTANT: Must iterate over fullStream to consume chunks
+    // onChunk callback won't fire unless we consume the stream!
+    try {
+      for await (const chunk of result.fullStream) {
+        // Handle different chunk types
+        switch (chunk.type) {
+          case 'text-delta':
+            onChunk(chunk.textDelta);
+            break;
+
+          case 'tool-call':
+            // Tool call started
+            toolCallsMap.set(chunk.toolCallId, {
+              name: chunk.toolName,
+              args: chunk.args,
+            });
+            console.log(`🔧 Tool call started: ${chunk.toolName}`, chunk.args);
+            onToolCallStart?.(chunk.toolCallId, chunk.toolName, chunk.args);
+            break;
+
+          case 'tool-result':
+            // Tool call completed
+            const toolCall = toolCallsMap.get(chunk.toolCallId);
+            if (toolCall) {
+              console.log(`✅ Tool call completed: ${toolCall.name}`);
+              onToolCallComplete?.(chunk.toolCallId, toolCall.name, chunk.result);
+            }
+            break;
+
+          case 'step-finish':
+            console.log(`📊 Step finished - ${chunk.toolCalls?.length || 0} tool calls`);
+            break;
+
+          case 'finish':
+            // Stream finished
+            console.log('✓ Stream finished');
+            console.log(`  Finish reason: ${chunk.finishReason}`);
+            console.log(`  Usage:`, chunk.usage);
+            break;
+
+          case 'error':
+            console.error('❌ Stream error:', chunk.error);
+            throw chunk.error;
+        }
+      }
+
+      // Call onComplete after stream is done
+      onComplete();
+    } catch (streamError) {
+      console.error('❌ Stream iteration error:', streamError);
+      throw streamError;
+    }
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
