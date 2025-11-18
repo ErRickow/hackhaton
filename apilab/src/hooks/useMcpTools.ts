@@ -17,7 +17,7 @@ export function useMcpTools(): UseMcpToolsReturn {
   /**
    * Convert MCP SDK tools to AI SDK format
    */
-  function convertMcpToolsToAiSdk(mcpTools: any[]): Record<string, any> {
+  function convertMcpToolsToAiSdk(mcpTools: any[], callToolFn: (name: string, args: any) => Promise<any>): Record<string, any> {
     const aiTools: Record<string, any> = {};
 
     for (const tool of mcpTools) {
@@ -28,8 +28,16 @@ export function useMcpTools(): UseMcpToolsReturn {
         description: tool.description || '',
         parameters,
         execute: async (args: any) => {
-          // Placeholder - actual execution happens via backend API
-          return { success: true, args };
+          // ✅ Actually call the MCP tool via backend
+          console.log(`🔧 Executing MCP tool: ${tool.name}`, args);
+          try {
+            const result = await callToolFn(tool.name, args);
+            console.log(`✅ Tool ${tool.name} executed successfully`);
+            return result;
+          } catch (error) {
+            console.error(`❌ Tool ${tool.name} execution failed:`, error);
+            throw error;
+          }
         }
       };
     }
@@ -192,7 +200,7 @@ export function useMcpTools(): UseMcpToolsReturn {
 
       // Convert MCP tools to AI SDK format
       console.log('\n🔄 Step 3: Converting tools to AI SDK format...');
-      const aiSdkTools = convertMcpToolsToAiSdk(mcpTools);
+      const aiSdkTools = convertMcpToolsToAiSdk(mcpTools, callTool);
       console.log(`✅ Converted ${Object.keys(aiSdkTools).length} tools to AI SDK format\n`);
 
       // Store everything (no MCP client - backend handles it)
