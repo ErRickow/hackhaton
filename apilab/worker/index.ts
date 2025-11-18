@@ -1,6 +1,12 @@
 /**
  * Cloudflare Worker untuk APILab Backend
- * Handles E2B MCP sandbox creation
+ * Handles E2B MCP sandbox creation and proxies MCP tool operations
+ *
+ * Available Endpoints:
+ * - POST /api/mcp/init - Create E2B sandbox with MCP gateway
+ * - GET /api/mcp/sandbox/:id - Get sandbox info
+ * - GET /api/mcp/tools/:id - List available MCP tools
+ * - POST /api/mcp/call/:id - Call MCP tool
  */
 
 import Sandbox from 'e2b';
@@ -23,8 +29,12 @@ function corsResponse(body: any, status = 200) {
   });
 }
 
-// In-memory cache (Workers KV lebih baik untuk production)
-const sandboxCache = new Map<string, any>();
+// In-memory cache with MCP client info (Workers KV lebih baik untuk production)
+const sandboxCache = new Map<string, {
+  sandbox: any;
+  mcpUrl: string;
+  mcpToken: string;
+}>();
 
 /**
  * Create E2B sandbox with MCP gateway
@@ -48,9 +58,13 @@ async function createMcpSandbox(apiKey: string, mcpServers: Record<string, any>)
   console.log('✅ Sandbox created successfully!');
   console.log('🔗 MCP URL:', mcpUrl);
 
-  // Cache the sandbox
+  // Cache the sandbox with MCP info
   const sandboxId = (sandbox as any).id || Date.now().toString();
-  sandboxCache.set(sandboxId, sandbox);
+  sandboxCache.set(sandboxId, {
+    sandbox,
+    mcpUrl,
+    mcpToken,
+  });
 
   return {
     sandboxId,
@@ -112,19 +126,127 @@ export default {
     // Get sandbox info
     if (url.pathname.startsWith('/api/mcp/sandbox/') && request.method === 'GET') {
       const sandboxId = url.pathname.split('/').pop();
-      const sandbox = sandboxCache.get(sandboxId || '');
+      const cached = sandboxCache.get(sandboxId || '');
 
-      if (!sandbox) {
+      if (!cached) {
         return corsResponse({ error: 'Sandbox not found' }, 404);
       }
 
-      const isRunning = (await sandbox.isRunning?.()) || false;
+      const isRunning = (await cached.sandbox.isRunning?.()) || false;
 
       return corsResponse({
         sandboxId,
         isRunning,
-        url: sandbox.getMcpUrl?.(),
+        url: cached.mcpUrl,
       });
+    }
+
+    // List MCP tools (using direct HTTP fetch to MCP gateway)
+    if (url.pathname.startsWith('/api/mcp/tools/') && request.method === 'GET') {
+      const sandboxId = url.pathname.split('/').pop();
+      const cached = sandboxCache.get(sandboxId || '');
+
+      if (!cached) {
+        return corsResponse({ error: 'Sandbox not found' }, 404);
+      }
+
+      try {
+        console.log('📋 Listing MCP tools for sandbox:', sandboxId);
+
+        // Fetch tools directly from MCP gateway using HTTP
+        const mcpResponse = await fetch(`${cached.mcpUrl}/tools/list`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${cached.mcpToken}`,
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: 'tools/list',
+            params: {}
+          })
+        });
+
+        if (!mcpResponse.ok) {
+          throw new Error(`MCP gateway error: ${mcpResponse.status} ${mcpResponse.statusText}`);
+        }
+
+        const mcpData = await mcpResponse.json();
+        const tools = mcpData.result?.tools || [];
+
+        console.log(`✅ Found ${tools.length} tools`);
+
+        return corsResponse({
+          tools,
+          count: tools.length
+        });
+      } catch (error: any) {
+        console.error('❌ Failed to list tools:', error);
+        return corsResponse({
+          error: error.message || 'Failed to list MCP tools',
+          details: error.stack
+        }, 500);
+      }
+    }
+
+    // Call MCP tool (using direct HTTP fetch to MCP gateway)
+    if (url.pathname.startsWith('/api/mcp/call/') && request.method === 'POST') {
+      const sandboxId = url.pathname.split('/').pop();
+      const cached = sandboxCache.get(sandboxId || '');
+
+      if (!cached) {
+        return corsResponse({ error: 'Sandbox not found' }, 404);
+      }
+
+      try {
+        const body: any = await request.json();
+        const { toolName, args } = body;
+
+        if (!toolName) {
+          return corsResponse({ error: 'toolName is required' }, 400);
+        }
+
+        console.log(`🔧 Calling tool: ${toolName}`, args);
+
+        // Call tool directly via MCP gateway using HTTP
+        const mcpResponse = await fetch(`${cached.mcpUrl}/tools/call`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${cached.mcpToken}`,
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: 'tools/call',
+            params: {
+              name: toolName,
+              arguments: args || {}
+            }
+          })
+        });
+
+        if (!mcpResponse.ok) {
+          throw new Error(`MCP gateway error: ${mcpResponse.status} ${mcpResponse.statusText}`);
+        }
+
+        const mcpData = await mcpResponse.json();
+        const result = mcpData.result;
+
+        console.log('✅ Tool call successful');
+
+        return corsResponse({
+          result: result?.content || result,
+          isError: result?.isError || false
+        });
+      } catch (error: any) {
+        console.error('❌ Failed to call tool:', error);
+        return corsResponse({
+          error: error.message || 'Failed to call MCP tool',
+          details: error.stack
+        }, 500);
+      }
     }
 
     // 404
