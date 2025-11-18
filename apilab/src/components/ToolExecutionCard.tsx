@@ -6,7 +6,7 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle2, XCircle, Zap, ChevronDown, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export type ToolStatus = 'pending' | 'running' | 'complete' | 'error';
 
@@ -30,6 +30,13 @@ export function ToolExecutionCard({
   endTime,
 }: ToolExecutionCardProps) {
   const [isExpanded, setIsExpanded] = useState(status === 'running' || status === 'error');
+
+  // Auto-expand when args change (tool is ready to execute)
+  useEffect(() => {
+    if (status === 'running' && args && Object.keys(args).length > 0) {
+      setIsExpanded(true);
+    }
+  }, [status, args]);
 
   const getStatusIcon = () => {
     switch (status) {
@@ -147,9 +154,18 @@ export function ToolExecutionCard({
 
           {/* Running message */}
           {status === 'running' && (
-            <p className="text-xs text-blue-700 dark:text-blue-300 italic">
-              Executing tool...
-            </p>
+            <div className="space-y-1">
+              <p className="text-xs text-blue-700 dark:text-blue-300 italic flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {args && Object.keys(args).length > 0 ? 'Executing API call...' : 'Preparing tool call...'}
+              </p>
+              {/* Show progress dots */}
+              <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
           )}
         </div>
       )}

@@ -92,7 +92,7 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
 
         {/* Text content */}
         {!content && isStreaming ? (
-          <ThinkingIndicator message="Analyzing request and preparing response..." />
+          <ThinkingIndicator message="Thinking about which tools to call..." />
         ) : parsed ? (
           <>
             {parsed.remainingText && (

@@ -140,13 +140,30 @@ export async function streamChatCompletion(
             onChunk(chunk.textDelta);
             break;
 
+          case 'tool-call-streaming-start':
+            // Tool call streaming started (AI is preparing args)
+            console.log(`🔧 Tool call streaming started: ${chunk.toolName}`);
+            // Create placeholder with empty args
+            toolCallsMap.set(chunk.toolCallId, {
+              name: chunk.toolName,
+              args: {},
+            });
+            onToolCallStart?.(chunk.toolCallId, chunk.toolName, {});
+            break;
+
+          case 'tool-call-delta':
+            // Tool call args streaming (show progress)
+            console.log(`📝 Tool call args delta: ${chunk.toolName}`, chunk.argsTextDelta);
+            break;
+
           case 'tool-call':
-            // Tool call started
+            // Tool call complete with all args (ready to execute)
             toolCallsMap.set(chunk.toolCallId, {
               name: chunk.toolName,
               args: chunk.args,
             });
-            console.log(`🔧 Tool call started: ${chunk.toolName}`, chunk.args);
+            console.log(`🔧 Tool call ready: ${chunk.toolName}`, chunk.args);
+            // Update with full args
             onToolCallStart?.(chunk.toolCallId, chunk.toolName, chunk.args);
             break;
 
