@@ -15,6 +15,18 @@ dist-ssr
 # Cloudflare Workers
 worker/.wrangler/
 
+# Test files with API keys (DO NOT COMMIT)
+test-*.ts
+test-*.mjs
+test-*.js
+*.local.ts
+*.local.js
+
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
