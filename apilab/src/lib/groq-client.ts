@@ -85,13 +85,22 @@ export interface ToolCallHandler {
   (toolName: string, args: Record<string, any>): Promise<any>;
 }
 
+export interface ToolCallStartHandler {
+  (toolCallId: string, toolName: string, args: Record<string, any>): void;
+}
+
+export interface ToolCallCompleteHandler {
+  (toolCallId: string, toolName: string, result: any): void;
+}
+
 export async function streamChatCompletion(
   messages: ChatMessage[],
   tools: any, // AI SDK tools format (from client.tools())
   onChunk: (text: string) => void,
   onComplete: () => void,
   onError: (error: Error) => void,
-  _onToolCall?: ToolCallHandler,
+  onToolCallStart?: ToolCallStartHandler,
+  onToolCallComplete?: ToolCallCompleteHandler,
   provider: LLMProvider = 'neosantara'
 ) {
   try {
@@ -99,9 +108,7 @@ export async function streamChatCompletion(
     const modelName = getModelName(provider);
 
     console.log(`🤖 Using ${provider} with model: ${modelName}`);
-    console.log(`🔗 Endpoint: ${provider === 'neosantara' ? 'https://api.neosantara.xyz/v1/chat/completions' : 'https://api.groq.com/openai/v1/chat/completions'}`);
-    console.log(`✓ Using Chat Completions API (not Responses API)`);
-    console.log(`🔧 Tools available: ${Object.keys(tools || {}).join(', ')}`);
+    console.log(`🔧 Tools available: ${Object.keys(tools || {}).length}`);
 
     // Format messages for AI SDK
     const formattedMessages = messages
@@ -111,33 +118,71 @@ export async function streamChatCompletion(
         content: m.content,
       }));
 
+    // Track tool calls
+    const toolCallsMap = new Map<string, { name: string; args: any }>();
+
     // Pass tools directly (NetGlade pattern - NO conversion!)
-    const result = streamText({
+    await streamText({
       model: llmProvider(modelName),
       messages: formattedMessages,
       tools: tools || {}, // Pass AI SDK tools directly!
       maxSteps: 20, // Allow multiple tool call rounds (NetGlade uses 20)
       onChunk: ({ chunk }) => {
+        // Handle different chunk types
         if (chunk.type === 'text-delta') {
           onChunk(chunk.textDelta);
+        } else if (chunk.type === 'tool-call') {
+          // Tool call started
+          const toolCallId = chunk.toolCallId;
+          const toolName = chunk.toolName;
+          const args = chunk.args;
+
+          toolCallsMap.set(toolCallId, { name: toolName, args });
+
+          console.log(`🔧 Tool call started: ${toolName}`, args);
+          onToolCallStart?.(toolCallId, toolName, args);
+        } else if (chunk.type === 'tool-result') {
+          // Tool call completed
+          const toolCallId = chunk.toolCallId;
+          const result = chunk.result;
+          const toolCall = toolCallsMap.get(toolCallId);
+
+          if (toolCall) {
+            console.log(`✅ Tool call completed: ${toolCall.name}`);
+            onToolCallComplete?.(toolCallId, toolCall.name, result);
+          }
         }
       },
-      onFinish: ({ toolCalls }) => {
+      onFinish: ({ text, toolCalls, toolResults, finishReason }) => {
         console.log('✓ Stream finished');
-        if (toolCalls && toolCalls.length > 0) {
-          console.log('🔧 Tool calls executed:', toolCalls.length);
-        }
+        console.log(`  Finish reason: ${finishReason}`);
+        console.log(`  Total tool calls: ${toolCalls?.length || 0}`);
+        console.log(`  Final text length: ${text?.length || 0} chars`);
+
         onComplete();
       },
     });
 
-    // Wait for the stream to complete
-    const fullText = await result.text;
-    console.log('📝 Full response:', fullText);
-
   } catch (error) {
-    console.error(`${provider} streaming error:`, error);
-    onError(error instanceof Error ? error : new Error(String(error)));
-    throw error;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`❌ ${provider} streaming error:`, errorMessage);
+
+    // Provide helpful error messages
+    let userFriendlyError: Error;
+
+    if (errorMessage.includes('API key')) {
+      userFriendlyError = new Error(`${provider === 'neosantara' ? 'Neosantara' : 'Groq'} API key is invalid or missing. Please check your Settings.`);
+    } else if (errorMessage.includes('401')) {
+      userFriendlyError = new Error(`Authentication failed with ${provider === 'neosantara' ? 'Neosantara' : 'Groq'}. Please verify your API key in Settings.`);
+    } else if (errorMessage.includes('429')) {
+      userFriendlyError = new Error(`Rate limit exceeded for ${provider === 'neosantara' ? 'Neosantara' : 'Groq'}. Please try again later.`);
+    } else if (errorMessage.includes('timeout')) {
+      userFriendlyError = new Error(`Request timed out. Please try again.`);
+    } else {
+      userFriendlyError = error instanceof Error ? error : new Error(errorMessage);
+    }
+
+    onError(userFriendlyError);
+    throw userFriendlyError;
   }
 }
