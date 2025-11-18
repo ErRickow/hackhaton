@@ -154,12 +154,13 @@ export default {
         console.log('📋 Listing MCP tools for sandbox:', sandboxId);
 
         // Fetch tools directly from MCP gateway using JSON-RPC over HTTP
+        // Request JSON response only (not SSE)
         const mcpResponse = await fetch(cached.mcpUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${cached.mcpToken}`,
-            'Accept': 'application/json, text/event-stream',
+            'Accept': 'application/json',
           },
           body: JSON.stringify({
             jsonrpc: '2.0',
@@ -170,9 +171,30 @@ export default {
         });
 
         if (!mcpResponse.ok) {
-          throw new Error(`MCP gateway error: ${mcpResponse.status} ${mcpResponse.statusText}`);
+          const errorText = await mcpResponse.text();
+          throw new Error(`MCP gateway error: ${mcpResponse.status} ${mcpResponse.statusText} - ${errorText}`);
         }
 
+        const contentType = mcpResponse.headers.get('content-type') || '';
+        console.log('Response content-type:', contentType);
+
+        // Handle SSE response if gateway sends it
+        if (contentType.includes('text/event-stream')) {
+          const text = await mcpResponse.text();
+          console.log('SSE response:', text.substring(0, 200));
+
+          // Parse SSE format: "data: {...}\n\n"
+          const dataMatch = text.match(/data: (.*)\n/);
+          if (dataMatch) {
+            const mcpData = JSON.parse(dataMatch[1]);
+            const tools = mcpData.result?.tools || [];
+            console.log(`✅ Found ${tools.length} tools (via SSE)`);
+            return corsResponse({ tools, count: tools.length });
+          }
+          throw new Error('Failed to parse SSE response');
+        }
+
+        // Handle regular JSON response
         const mcpData = await mcpResponse.json();
         const tools = mcpData.result?.tools || [];
 
@@ -216,7 +238,7 @@ export default {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${cached.mcpToken}`,
-            'Accept': 'application/json, text/event-stream',
+            'Accept': 'application/json',
           },
           body: JSON.stringify({
             jsonrpc: '2.0',
@@ -230,12 +252,32 @@ export default {
         });
 
         if (!mcpResponse.ok) {
-          throw new Error(`MCP gateway error: ${mcpResponse.status} ${mcpResponse.statusText}`);
+          const errorText = await mcpResponse.text();
+          throw new Error(`MCP gateway error: ${mcpResponse.status} ${mcpResponse.statusText} - ${errorText}`);
         }
 
-        const mcpData = await mcpResponse.json();
-        const result = mcpData.result;
+        const contentType = mcpResponse.headers.get('content-type') || '';
+        console.log('Response content-type:', contentType);
 
+        let mcpData;
+        // Handle SSE response if gateway sends it
+        if (contentType.includes('text/event-stream')) {
+          const text = await mcpResponse.text();
+          console.log('SSE response:', text.substring(0, 200));
+
+          // Parse SSE format: "data: {...}\n\n"
+          const dataMatch = text.match(/data: (.*)\n/);
+          if (dataMatch) {
+            mcpData = JSON.parse(dataMatch[1]);
+          } else {
+            throw new Error('Failed to parse SSE response');
+          }
+        } else {
+          // Handle regular JSON response
+          mcpData = await mcpResponse.json();
+        }
+
+        const result = mcpData.result;
         console.log('✅ Tool call successful');
 
         return corsResponse({

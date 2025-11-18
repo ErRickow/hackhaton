@@ -5,7 +5,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Send, Loader2, Settings as SettingsIcon, AlertCircle } from 'lucide-react'
+import { Send, Loader2, Settings as SettingsIcon, AlertCircle, Copy, Check } from 'lucide-react'
 import { ChatMessage } from '@/components/ChatMessage'
 import { ToolExecutionCard } from '@/components/ToolExecutionCard'
 import { Settings } from '@/components/Settings'
@@ -19,6 +19,7 @@ function App() {
   const { isStarting, isReady, error: mcpError, restartConnection } = useMcpTools()
   const { isConfigured } = useApiKeys()
   const [showSettings, setShowSettings] = useState(!isConfigured)
+  const [copiedError, setCopiedError] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when new messages arrive
@@ -27,6 +28,25 @@ function App() {
   }, [messages])
 
   const showError = error || mcpError
+
+  // Copy error to clipboard
+  const copyErrorToClipboard = () => {
+    if (!showError) return
+
+    const errorText = JSON.stringify({
+      message: showError.message,
+      name: showError.name,
+      stack: showError.stack,
+      ...showError
+    }, null, 2)
+
+    navigator.clipboard.writeText(errorText).then(() => {
+      setCopiedError(true)
+      setTimeout(() => setCopiedError(false), 2000)
+    }).catch(err => {
+      console.error('Failed to copy:', err)
+    })
+  }
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -71,9 +91,29 @@ function App() {
           {/* Error Display - Raw Debug Format */}
           {showError && (
             <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-              <div className="flex items-start gap-2 mb-2">
-                <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                <p className="text-sm font-medium text-destructive">Error (Raw Debug Info)</p>
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-sm font-medium text-destructive">Error (Raw Debug Info)</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={copyErrorToClipboard}
+                  className="h-7 px-2 hover:bg-destructive/20"
+                >
+                  {copiedError ? (
+                    <>
+                      <Check className="h-3 w-3 mr-1" />
+                      <span className="text-xs">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3 mr-1" />
+                      <span className="text-xs">Copy</span>
+                    </>
+                  )}
+                </Button>
               </div>
               <div className="bg-black/5 dark:bg-black/20 rounded p-2 overflow-x-auto max-h-96 overflow-y-auto">
                 <pre className="text-xs font-mono text-destructive whitespace-pre-wrap break-all">
