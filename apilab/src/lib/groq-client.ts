@@ -127,6 +127,7 @@ export async function streamChatCompletion(
       messages: formattedMessages,
       tools: tools || {}, // Pass AI SDK tools directly!
       maxSteps: 20, // Allow multiple tool call rounds (NetGlade uses 20)
+      abortSignal: AbortSignal.timeout(120000), // 2 minute timeout
       onChunk: ({ chunk }) => {
         // Handle different chunk types
         if (chunk.type === 'text-delta') {
@@ -166,6 +167,7 @@ export async function streamChatCompletion(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`❌ ${provider} streaming error:`, errorMessage);
+    console.error('Full error object:', error);
 
     // Provide helpful error messages
     let userFriendlyError: Error;
@@ -176,8 +178,10 @@ export async function streamChatCompletion(
       userFriendlyError = new Error(`Authentication failed with ${provider === 'neosantara' ? 'Neosantara' : 'Groq'}. Please verify your API key in Settings.`);
     } else if (errorMessage.includes('429')) {
       userFriendlyError = new Error(`Rate limit exceeded for ${provider === 'neosantara' ? 'Neosantara' : 'Groq'}. Please try again later.`);
-    } else if (errorMessage.includes('timeout')) {
-      userFriendlyError = new Error(`Request timed out. Please try again.`);
+    } else if (errorMessage.includes('timeout') || errorMessage.includes('TimeoutError') || errorMessage.includes('aborted')) {
+      userFriendlyError = new Error(`Request timed out after 2 minutes. The ${provider === 'neosantara' ? 'Neosantara' : 'Groq'} API may be slow or unreachable. Try again or switch to ${provider === 'neosantara' ? 'Groq' : 'Neosantara'} in Settings.`);
+    } else if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('ENOTFOUND') || errorMessage.includes('EAI_AGAIN')) {
+      userFriendlyError = new Error(`Network error: Cannot reach ${provider === 'neosantara' ? 'Neosantara' : 'Groq'} API. Check your internet connection or try switching to ${provider === 'neosantara' ? 'Groq' : 'Neosantara'} in Settings.`);
     } else {
       userFriendlyError = error instanceof Error ? error : new Error(errorMessage);
     }
