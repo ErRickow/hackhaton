@@ -68,7 +68,27 @@ export function useApiChat(): UseApiChatReturn {
 
     // Use minimal system prompt (following zola-chat reference pattern)
     // Empty or minimal prompts work better - the AI SDK handles tool invocation
-    console.log('🔍 Available tools:', Object.keys(tools || {}));
+    console.log('\n🔍 ===== TOOLS DEBUG INFO =====');
+    console.log('Tools object type:', typeof tools);
+    console.log('Tools is object:', typeof tools === 'object');
+    console.log('Tools keys:', Object.keys(tools || {}));
+    console.log('Tools count:', Object.keys(tools || {}).length);
+    console.log('Tools object:', tools);
+
+    // Check structure of first tool
+    const firstToolName = Object.keys(tools || {})[0];
+    if (firstToolName) {
+      const firstTool = tools[firstToolName];
+      console.log('\n🔍 First tool analysis:');
+      console.log('  Name:', firstToolName);
+      console.log('  Type:', typeof firstTool);
+      console.log('  Keys:', Object.keys(firstTool || {}));
+      console.log('  Has description:', 'description' in (firstTool || {}));
+      console.log('  Has parameters:', 'parameters' in (firstTool || {}));
+      console.log('  Has execute:', 'execute' in (firstTool || {}));
+      console.log('  Full structure:', firstTool);
+    }
+    console.log('===== END TOOLS DEBUG =====\n');
 
     const systemPrompt = `You are APILab AI - an API testing assistant.`;
 

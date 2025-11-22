@@ -8,6 +8,23 @@ import type { UseMcpToolsReturn } from '@/types';
 import { z } from 'zod';
 import { tool } from 'ai';
 
+// TEST: Hardcoded simple tool to verify tool calling works
+const testTool = tool({
+  description: 'A simple test tool that returns the current time. Use this to test if tool calling is working.',
+  parameters: z.object({
+    message: z.string().describe('A message to include in the response'),
+  }),
+  execute: async ({ message }) => {
+    console.log('🎯 TEST TOOL CALLED! Message:', message);
+    return {
+      status: 'success',
+      message: `Test tool executed successfully! Your message: ${message}`,
+      timestamp: new Date().toISOString(),
+      note: 'This proves tool calling is working!'
+    };
+  },
+});
+
 export function useMcpTools(): UseMcpToolsReturn {
   const [mcpServer, setMcpServer] = useState<any>(null);
   const [tools, setTools] = useState<any>({}); // Store AI SDK tools format
@@ -61,9 +78,17 @@ export function useMcpTools(): UseMcpToolsReturn {
       console.log(`✅ Registered tool: ${mcpTool.name}`, {
         description: mcpTool.description,
         hasParameters: !!inputSchema,
-        hasExecute: typeof toolDefinition === 'object'
+        toolType: typeof toolDefinition,
+        toolKeys: Object.keys(toolDefinition || {}),
+        toolStructure: toolDefinition
       });
     }
+
+    console.log('\n🔍 FINAL TOOLS OBJECT STRUCTURE:');
+    console.log('Type:', typeof aiTools);
+    console.log('Keys:', Object.keys(aiTools));
+    console.log('First tool sample:', Object.values(aiTools)[0]);
+    console.log('Full object:', aiTools);
 
     return aiTools;
   }
@@ -235,6 +260,10 @@ export function useMcpTools(): UseMcpToolsReturn {
       console.log('\n🔄 Step 3: Converting tools to AI SDK format...');
       const aiSdkTools = convertMcpToolsToAiSdk(mcpTools, callTool);
       console.log(`✅ Converted ${Object.keys(aiSdkTools).length} tools to AI SDK format\n`);
+
+      // Add test tool for debugging
+      aiSdkTools['test_tool'] = testTool;
+      console.log('🎯 Added hardcoded test_tool for debugging');
 
       // Store everything (no MCP client - backend handles it)
       setMcpServer({ sandboxId, backendUrl });

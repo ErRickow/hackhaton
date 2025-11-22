@@ -4,7 +4,7 @@
  */
 
 import { createOpenAI } from '@ai-sdk/openai';
-import { streamText } from 'ai';
+import { streamText, type ToolSet } from 'ai';
 
 export type LLMProvider = 'neosantara' | 'groq';
 
@@ -115,25 +115,32 @@ export async function streamChatCompletion(
     console.log(`🔧 Available Tools:`, Object.keys(tools || {}));
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-    // Format messages for AI SDK
+    // Extract system prompt from messages (following zola-chat pattern)
+    const systemMessage = messages.find(m => m.role === 'system');
+    const systemPrompt = systemMessage?.content || '';
+
+    // Format messages for AI SDK (exclude system message - passed separately)
     const formattedMessages = messages
-      .filter(m => m.role !== 'tool') // AI SDK handles tool results differently
+      .filter(m => m.role !== 'system' && m.role !== 'tool') // AI SDK handles tool results differently
       .map(m => ({
-        role: m.role as 'user' | 'assistant' | 'system',
+        role: m.role as 'user' | 'assistant',
         content: m.content,
       }));
+
+    console.log('📋 System prompt:', systemPrompt);
+    console.log('📨 Message count (excluding system):', formattedMessages.length);
 
     // Track tool calls
     const toolCallsMap = new Map<string, { name: string; args: any }>();
 
-    // Start streaming (returns stream object, not promise)
+    // Start streaming (following zola-chat reference pattern)
     const result = streamText({
       model: llmProvider(modelName),
+      system: systemPrompt, // Pass system separately (like reference)
       messages: formattedMessages,
-      tools: tools || {}, // Pass AI SDK tools directly!
-      toolChoice: 'auto', // Let AI decide when to use tools (guided by system prompt)
-      maxSteps: 20, // Allow multiple tool call rounds (NetGlade uses 20)
-      abortSignal: AbortSignal.timeout(120000), // 2 minute timeout
+      tools: tools as ToolSet, // Cast to ToolSet (like reference)
+      // NOTE: Reference doesn't use toolChoice - let model decide naturally
+      maxSteps: 10, // Match reference (10 steps)
     });
 
     // IMPORTANT: Must iterate over fullStream to consume chunks
