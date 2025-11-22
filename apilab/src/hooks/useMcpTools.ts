@@ -40,55 +40,61 @@ export function useMcpTools(): UseMcpToolsReturn {
     const aiTools: Record<string, any> = {};
 
     for (const mcpTool of mcpTools) {
-      // Convert MCP tool schema to Zod schema
-      const inputSchema = mcpTool.inputSchema ? convertJsonSchemaToZod(mcpTool.inputSchema) : z.object({});
+      try {
+        console.log(`\n🔄 Converting tool: ${mcpTool.name}`);
+        console.log('  Original schema:', JSON.stringify(mcpTool.inputSchema, null, 2));
 
-      // Use AI SDK's tool() helper - this ensures correct type inference
-      const toolDefinition = tool({
-        description: mcpTool.description || `Tool: ${mcpTool.name}`,
-        parameters: inputSchema, // AI SDK tool() helper uses 'parameters' property
-        execute: async (args) => {
-          // ✅ Actually call the MCP tool via backend
-          console.log(`🔧 Executing MCP tool: ${mcpTool.name}`, args);
-          try {
-            const response = await callToolFn(mcpTool.name, args);
-            console.log(`✅ Tool ${mcpTool.name} executed successfully`, response);
+        // Convert MCP tool schema to Zod schema
+        const inputSchema = mcpTool.inputSchema ? convertJsonSchemaToZod(mcpTool.inputSchema) : z.object({});
 
-            // Backend returns { result: actualData, isError: false }
-            // AI SDK expects just the actualData, not wrapped
-            if (response && typeof response === 'object' && 'result' in response) {
-              // Check for errors
-              if (response.isError) {
-                throw new Error(JSON.stringify(response.result));
+        // Create a clear, detailed description (important for LLM!)
+        const description = mcpTool.description || `Tool: ${mcpTool.name}`;
+        console.log('  Description:', description);
+
+        // Use AI SDK's tool() helper - this ensures correct type inference
+        const toolDefinition = tool({
+          description: description,
+          parameters: inputSchema, // AI SDK tool() helper uses 'parameters' property
+          execute: async (args) => {
+            // ✅ Actually call the MCP tool via backend
+            console.log(`🔧 Executing MCP tool: ${mcpTool.name}`, args);
+            try {
+              const response = await callToolFn(mcpTool.name, args);
+              console.log(`✅ Tool ${mcpTool.name} executed successfully`, response);
+
+              // Backend returns { result: actualData, isError: false }
+              // AI SDK expects just the actualData, not wrapped
+              if (response && typeof response === 'object' && 'result' in response) {
+                // Check for errors
+                if (response.isError) {
+                  throw new Error(JSON.stringify(response.result));
+                }
+                // Return unwrapped result
+                return response.result;
               }
-              // Return unwrapped result
-              return response.result;
+
+              // Fallback: return as-is if not wrapped
+              return response;
+            } catch (error) {
+              console.error(`❌ Tool ${mcpTool.name} execution failed:`, error);
+              throw error;
             }
-
-            // Fallback: return as-is if not wrapped
-            return response;
-          } catch (error) {
-            console.error(`❌ Tool ${mcpTool.name} execution failed:`, error);
-            throw error;
           }
-        }
-      });
+        });
 
-      aiTools[mcpTool.name] = toolDefinition;
-      console.log(`✅ Registered tool: ${mcpTool.name}`, {
-        description: mcpTool.description,
-        hasParameters: !!inputSchema,
-        toolType: typeof toolDefinition,
-        toolKeys: Object.keys(toolDefinition || {}),
-        toolStructure: toolDefinition
-      });
+        aiTools[mcpTool.name] = toolDefinition;
+        console.log(`✅ Successfully registered tool: ${mcpTool.name}`);
+
+      } catch (error) {
+        console.error(`❌ Failed to convert tool ${mcpTool.name}:`, error);
+        // Continue with other tools instead of failing entirely
+        console.warn(`⚠️ Skipping tool ${mcpTool.name} due to conversion error`);
+      }
     }
 
-    console.log('\n🔍 FINAL TOOLS OBJECT STRUCTURE:');
-    console.log('Type:', typeof aiTools);
-    console.log('Keys:', Object.keys(aiTools));
-    console.log('First tool sample:', Object.values(aiTools)[0]);
-    console.log('Full object:', aiTools);
+    console.log('\n🔍 FINAL TOOLS OBJECT:');
+    console.log('  Registered tools:', Object.keys(aiTools));
+    console.log('  Total count:', Object.keys(aiTools).length);
 
     return aiTools;
   }
@@ -98,7 +104,15 @@ export function useMcpTools(): UseMcpToolsReturn {
    * Descriptions help the LLM understand how to use each parameter
    */
   function convertJsonSchemaToZod(schema: any): z.ZodType<any> {
-    if (!schema || !schema.properties) {
+    // If no schema or empty schema, return empty object
+    if (!schema) {
+      console.log('    No schema provided, using z.object({})');
+      return z.object({});
+    }
+
+    // If schema has no properties, return empty object
+    if (!schema.properties || Object.keys(schema.properties).length === 0) {
+      console.log('    Schema has no properties, using z.object({})');
       return z.object({});
     }
 
@@ -106,36 +120,68 @@ export function useMcpTools(): UseMcpToolsReturn {
 
     for (const [key, value] of Object.entries(schema.properties as Record<string, any>)) {
       const isRequired = schema.required?.includes(key) ?? false;
-      const description = value.description || '';
+      const description = value.description || `Parameter: ${key}`;
 
       let zodType: z.ZodType<any>;
 
-      switch (value.type) {
+      // Handle type as array (JSON Schema allows multiple types)
+      const types = Array.isArray(value.type) ? value.type : [value.type];
+      const primaryType = types[0];
+
+      switch (primaryType) {
         case 'string':
           zodType = z.string();
+          // Handle enums
+          if (value.enum && Array.isArray(value.enum)) {
+            zodType = z.enum(value.enum as [string, ...string[]]);
+          }
           break;
         case 'number':
+        case 'integer':
           zodType = z.number();
+          // Handle min/max
+          if (typeof value.minimum === 'number') {
+            zodType = (zodType as z.ZodNumber).min(value.minimum);
+          }
+          if (typeof value.maximum === 'number') {
+            zodType = (zodType as z.ZodNumber).max(value.maximum);
+          }
           break;
         case 'boolean':
           zodType = z.boolean();
           break;
         case 'array':
-          zodType = z.array(z.any());
+          // Handle array items
+          if (value.items) {
+            const itemSchema = convertJsonSchemaToZod({ properties: { item: value.items }, required: [] });
+            zodType = z.array(z.any()); // Simplified for now
+          } else {
+            zodType = z.array(z.any());
+          }
           break;
         case 'object':
-          zodType = z.object({});
+          // Recursively handle nested objects
+          if (value.properties) {
+            zodType = convertJsonSchemaToZod(value);
+          } else {
+            zodType = z.record(z.any());
+          }
+          break;
+        case 'null':
+          zodType = z.null();
           break;
         default:
+          console.warn(`    Unknown type "${primaryType}" for parameter "${key}", using z.any()`);
           zodType = z.any();
       }
 
-      // Add description if available (helps LLM understand the parameter)
-      if (description) {
-        zodType = zodType.describe(description);
-      }
+      // Add description (IMPORTANT for LLM!)
+      zodType = zodType.describe(description);
 
+      // Make optional if not required
       shape[key] = isRequired ? zodType : zodType.optional();
+
+      console.log(`    - ${key}: ${primaryType}${isRequired ? ' (required)' : ' (optional)'} - ${description}`);
     }
 
     return z.object(shape);
