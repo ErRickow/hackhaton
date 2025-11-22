@@ -157,10 +157,12 @@ export default {
 
         // Use MCP JSON-RPC protocol to list tools
         // Based on E2B examples: client.listTools() sends tools/list JSON-RPC request
+        // IMPORTANT: MCP gateway requires Accept header with BOTH content types
         const mcpResponse = await fetch(cached.mcpUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json, text/event-stream',
             'Authorization': `Bearer ${cached.mcpToken}`,
           },
           body: JSON.stringify({
@@ -236,10 +238,12 @@ export default {
 
         // Use MCP JSON-RPC protocol to call tool
         // Based on E2B examples: client.callTool(name, arguments) sends tools/call JSON-RPC request
+        // IMPORTANT: MCP gateway requires Accept header with BOTH content types
         const mcpResponse = await fetch(cached.mcpUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json, text/event-stream',
             'Authorization': `Bearer ${cached.mcpToken}`,
           },
           body: JSON.stringify({
