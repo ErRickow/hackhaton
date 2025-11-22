@@ -126,6 +126,7 @@ export async function streamChatCompletion(
       model: llmProvider(modelName),
       messages: formattedMessages,
       tools: tools || {}, // Pass AI SDK tools directly!
+      toolChoice: 'auto', // Let AI decide when to use tools (guided by system prompt)
       maxSteps: 20, // Allow multiple tool call rounds (NetGlade uses 20)
       abortSignal: AbortSignal.timeout(120000), // 2 minute timeout
     });
