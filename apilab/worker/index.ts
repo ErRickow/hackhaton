@@ -34,14 +34,16 @@ const sandboxCache = new Map<string, {
   sandbox: any;
   mcpUrl: string;
   mcpToken: string;
+  sessionId: string;
   initialized: boolean;
 }>();
 
 /**
  * Initialize MCP session with proper handshake
  * MCP protocol requires: initialize request → initialized notification
+ * Returns the session ID that must be included in all subsequent requests
  */
-async function initializeMcpSession(mcpUrl: string, mcpToken: string) {
+async function initializeMcpSession(mcpUrl: string, mcpToken: string): Promise<string> {
   console.log('🤝 Initializing MCP session...');
 
   // Step 1: Send initialize request
@@ -76,6 +78,10 @@ async function initializeMcpSession(mcpUrl: string, mcpToken: string) {
     throw new Error(`MCP initialize failed: ${initResponse.status} - ${errorText}`);
   }
 
+  // CRITICAL: Extract Mcp-Session-Id header for subsequent requests
+  const sessionId = initResponse.headers.get('Mcp-Session-Id') || '';
+  console.log('   Session ID:', sessionId);
+
   // Parse response (may be SSE or JSON)
   const contentType = initResponse.headers.get('content-type') || '';
   const responseText = await initResponse.text();
@@ -93,12 +99,14 @@ async function initializeMcpSession(mcpUrl: string, mcpToken: string) {
   console.log('   Server capabilities:', JSON.stringify(initData.result).substring(0, 200));
 
   // Step 2: Send initialized notification (no params field for notifications!)
+  // IMPORTANT: Include session ID in notification
   const notifyResponse = await fetch(mcpUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json, text/event-stream',
       'Authorization': `Bearer ${mcpToken}`,
+      ...(sessionId && { 'Mcp-Session-Id': sessionId }),
     },
     body: JSON.stringify({
       jsonrpc: '2.0',
@@ -112,7 +120,9 @@ async function initializeMcpSession(mcpUrl: string, mcpToken: string) {
   // (MCP gateway might need time to transition out of init state)
   await new Promise(resolve => setTimeout(resolve, 100));
 
-  console.log('✅ MCP session initialized');
+  console.log('✅ MCP session initialized with ID:', sessionId);
+
+  return sessionId;
 }
 
 /**
@@ -137,15 +147,16 @@ async function createMcpSandbox(apiKey: string, mcpServers: Record<string, any>)
   console.log('✅ Sandbox created successfully!');
   console.log('🔗 MCP URL:', mcpUrl);
 
-  // Initialize MCP session with proper handshake
-  await initializeMcpSession(mcpUrl, mcpToken);
+  // Initialize MCP session with proper handshake and get session ID
+  const sessionId = await initializeMcpSession(mcpUrl, mcpToken);
 
-  // Cache the sandbox with MCP info
+  // Cache the sandbox with MCP info including session ID
   const sandboxId = (sandbox as any).id || Date.now().toString();
   sandboxCache.set(sandboxId, {
     sandbox,
     mcpUrl,
     mcpToken,
+    sessionId,
     initialized: true,
   });
 
@@ -237,16 +248,19 @@ export default {
         console.log('📋 Listing MCP tools for sandbox:', sandboxId);
         console.log('   MCP URL:', cached.mcpUrl);
         console.log('   Token:', cached.mcpToken.substring(0, 10) + '...');
+        console.log('   Session ID:', cached.sessionId);
 
         // Use MCP JSON-RPC protocol to list tools
         // Based on E2B examples: client.listTools() sends tools/list JSON-RPC request
         // IMPORTANT: MCP gateway requires Accept header with BOTH content types
+        // CRITICAL: Must include Mcp-Session-Id header from initialization
         const mcpResponse = await fetch(cached.mcpUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json, text/event-stream',
             'Authorization': `Bearer ${cached.mcpToken}`,
+            'Mcp-Session-Id': cached.sessionId,
           },
           body: JSON.stringify({
             jsonrpc: '2.0',
@@ -339,16 +353,19 @@ export default {
 
         console.log(`🔧 Calling tool: ${toolName}`);
         console.log('   Args:', JSON.stringify(args));
+        console.log('   Session ID:', cached.sessionId);
 
         // Use MCP JSON-RPC protocol to call tool
         // Based on E2B examples: client.callTool(name, arguments) sends tools/call JSON-RPC request
         // IMPORTANT: MCP gateway requires Accept header with BOTH content types
+        // CRITICAL: Must include Mcp-Session-Id header from initialization
         const mcpResponse = await fetch(cached.mcpUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json, text/event-stream',
             'Authorization': `Bearer ${cached.mcpToken}`,
+            'Mcp-Session-Id': cached.sessionId,
           },
           body: JSON.stringify({
             jsonrpc: '2.0',
