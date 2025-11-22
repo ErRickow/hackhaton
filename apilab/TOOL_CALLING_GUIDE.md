@@ -832,6 +832,509 @@ if (response.status === 404) {
 
 ## Live Demo
 
+### Using Deployed Cloudflare Worker as Tools
+
+This section shows how to use an already-deployed Cloudflare Worker (e2b-mcp-api) directly with OpenAI SDK.
+
+#### Prerequisites
+
+✅ **Worker deployed**: `https://your-worker.workers.dev`
+✅ **E2B_API_KEY**: Set in Cloudflare Worker secrets
+✅ **Frontend**: React app with OpenAI SDK
+
+---
+
+### Method 1: Direct Worker URL in Tools
+
+The simplest approach - use worker endpoints directly in tool definitions.
+
+**Step 1: Define Tool with Worker URL**
+
+```typescript
+import { z } from 'zod';
+
+// Worker URL (already deployed)
+const WORKER_URL = 'https://your-worker.workers.dev';
+
+// Define tool that calls worker directly
+const searchTool = {
+  description: 'Search the web for information using Tavily',
+  parameters: z.object({
+    query: z.string().describe('Search query'),
+    max_results: z.coerce.number().optional().default(5),
+  }),
+  execute: async (args: { query: string; max_results?: number }) => {
+    // Initialize session (if not already done)
+    const initRes = await fetch(`${WORKER_URL}/api/mcp/init`, {
+      method: 'POST',
+    });
+    const { sandboxId } = await initRes.json();
+
+    // Call tool via worker
+    const res = await fetch(`${WORKER_URL}/api/mcp/call/${sandboxId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        toolName: 'tavily_search',
+        args,
+      }),
+    });
+
+    return await res.json();
+  },
+};
+```
+
+**Step 2: Use in OpenAI SDK**
+
+```typescript
+import { createOpenAI } from '@ai-sdk/openai';
+import { generateText } from 'ai';
+
+const neosantara = createOpenAI({
+  apiKey: 'nsk_your_key',
+  baseURL: 'https://api.neosantara.xyz/v1',
+});
+
+const result = await generateText({
+  model: neosantara('neosantara/Meta-Llama-3.1-70B-Instruct-Turbo'),
+  prompt: 'Search for the latest AI research papers',
+  tools: {
+    tavily_search: searchTool, // Tool using worker URL
+  },
+  maxSteps: 5,
+});
+
+console.log(result.text);
+```
+
+---
+
+### Method 2: Fetch Tools from Worker Dynamically
+
+Better approach - fetch available tools from worker and auto-convert.
+
+**Step 1: Fetch Tools from Worker**
+
+```typescript
+import { z } from 'zod';
+
+const WORKER_URL = 'https://your-worker.workers.dev';
+let sandboxId: string | null = null;
+
+async function fetchToolsFromWorker() {
+  // 1. Initialize MCP session
+  if (!sandboxId) {
+    const initRes = await fetch(`${WORKER_URL}/api/mcp/init`, {
+      method: 'POST',
+    });
+    const data = await initRes.json();
+    sandboxId = data.sandboxId;
+  }
+
+  // 2. Get available tools from worker
+  const toolsRes = await fetch(`${WORKER_URL}/api/mcp/tools/${sandboxId}`);
+  const { tools: mcpTools } = await toolsRes.json();
+
+  // 3. Convert to OpenAI SDK format
+  const sdkTools: Record<string, any> = {};
+
+  for (const tool of mcpTools) {
+    sdkTools[tool.name] = {
+      description: tool.description,
+      parameters: convertJsonSchemaToZod(tool.inputSchema),
+      execute: async (args: any) => {
+        const res = await fetch(`${WORKER_URL}/api/mcp/call/${sandboxId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ toolName: tool.name, args }),
+        });
+        return await res.json();
+      },
+    };
+  }
+
+  return sdkTools;
+}
+
+// Helper: Convert JSON Schema to Zod
+function convertJsonSchemaToZod(schema: any) {
+  const zodSchema: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(schema.properties || {})) {
+    let zodType: any;
+
+    switch (value.type) {
+      case 'string':
+        zodType = z.string();
+        break;
+      case 'number':
+      case 'integer':
+        zodType = z.coerce.number();
+        break;
+      case 'boolean':
+        zodType = z.coerce.boolean();
+        break;
+      case 'array':
+        zodType = z.array(z.any());
+        break;
+      default:
+        zodType = z.any();
+    }
+
+    if (value.description) {
+      zodType = zodType.describe(value.description);
+    }
+
+    if (!schema.required?.includes(key)) {
+      zodType = zodType.optional();
+    }
+
+    zodSchema[key] = zodType;
+  }
+
+  return z.object(zodSchema);
+}
+```
+
+**Step 2: Use Dynamically Fetched Tools**
+
+```typescript
+import { createOpenAI } from '@ai-sdk/openai';
+import { streamText } from 'ai';
+
+// Fetch tools from worker
+const tools = await fetchToolsFromWorker();
+
+console.log('Available tools:', Object.keys(tools));
+// Output: ['tavily_search', 'arxiv_search', 'weather', ...]
+
+// Use with OpenAI SDK
+const neosantara = createOpenAI({
+  apiKey: process.env.NEOSANTARA_API_KEY,
+  baseURL: 'https://api.neosantara.xyz/v1',
+});
+
+const result = streamText({
+  model: neosantara('neosantara/Meta-Llama-3.1-70B-Instruct-Turbo'),
+  prompt: 'What is the weather in Jakarta?',
+  tools, // All tools from worker
+  maxSteps: 10,
+});
+
+for await (const chunk of result.fullStream) {
+  if (chunk.type === 'text-delta') {
+    process.stdout.write(chunk.textDelta);
+  }
+}
+```
+
+---
+
+### Method 3: React Hook for Worker Tools
+
+For React applications - create a reusable hook.
+
+```typescript
+// useWorkerTools.ts
+import { useState, useEffect } from 'react';
+import { z } from 'zod';
+
+const WORKER_URL = import.meta.env.VITE_WORKER_URL || 'https://your-worker.workers.dev';
+
+export function useWorkerTools() {
+  const [tools, setTools] = useState<Record<string, any>>({});
+  const [isReady, setIsReady] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    let sandboxId: string;
+
+    async function init() {
+      try {
+        // Initialize session
+        const initRes = await fetch(`${WORKER_URL}/api/mcp/init`, {
+          method: 'POST',
+        });
+        const { sandboxId: id } = await initRes.json();
+        sandboxId = id;
+
+        // Fetch tools
+        const toolsRes = await fetch(`${WORKER_URL}/api/mcp/tools/${sandboxId}`);
+        const { tools: mcpTools } = await toolsRes.json();
+
+        // Convert to SDK format
+        const sdkTools: Record<string, any> = {};
+
+        for (const tool of mcpTools) {
+          sdkTools[tool.name] = {
+            description: tool.description,
+            parameters: convertToZod(tool.inputSchema),
+            execute: async (args: any) => {
+              const res = await fetch(`${WORKER_URL}/api/mcp/call/${sandboxId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ toolName: tool.name, args }),
+              });
+              return await res.json();
+            },
+          };
+        }
+
+        setTools(sdkTools);
+        setIsReady(true);
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error(String(err)));
+      }
+    }
+
+    init();
+  }, []);
+
+  return { tools, isReady, error };
+}
+
+function convertToZod(schema: any) {
+  // ... (same as above)
+}
+```
+
+**Usage:**
+
+```typescript
+// App.tsx
+import { useWorkerTools } from './hooks/useWorkerTools';
+import { createOpenAI } from '@ai-sdk/openai';
+import { streamText } from 'ai';
+
+function App() {
+  const { tools, isReady } = useWorkerTools();
+
+  const handleChat = async (prompt: string) => {
+    if (!isReady) return;
+
+    const neosantara = createOpenAI({
+      apiKey: import.meta.env.VITE_NEOSANTARA_API_KEY,
+      baseURL: 'https://api.neosantara.xyz/v1',
+    });
+
+    const result = streamText({
+      model: neosantara('neosantara/Meta-Llama-3.1-70B-Instruct-Turbo'),
+      prompt,
+      tools, // ← Tools from worker
+      maxSteps: 10,
+    });
+
+    for await (const chunk of result.fullStream) {
+      // Handle chunks
+    }
+  };
+
+  return (
+    <div>
+      <button onClick={() => handleChat('Search for AI news')}>
+        Search AI News
+      </button>
+      <p>Tools ready: {isReady ? 'Yes' : 'Loading...'}</p>
+    </div>
+  );
+}
+```
+
+---
+
+### Complete Example: Node.js Script
+
+Full working example using deployed worker.
+
+```typescript
+// chat.ts
+import { createOpenAI } from '@ai-sdk/openai';
+import { streamText } from 'ai';
+import { z } from 'zod';
+
+const WORKER_URL = 'https://your-worker.workers.dev';
+
+// Fetch tools from worker
+async function getTools() {
+  // Init session
+  const initRes = await fetch(`${WORKER_URL}/api/mcp/init`, {
+    method: 'POST',
+  });
+  const { sandboxId } = await initRes.json();
+
+  // Get tools
+  const toolsRes = await fetch(`${WORKER_URL}/api/mcp/tools/${sandboxId}`);
+  const { tools: mcpTools } = await toolsRes.json();
+
+  // Convert to SDK format
+  const tools: Record<string, any> = {};
+
+  for (const tool of mcpTools) {
+    tools[tool.name] = {
+      description: tool.description,
+      parameters: z.object(
+        Object.fromEntries(
+          Object.entries(tool.inputSchema.properties || {}).map(([key, value]: [string, any]) => {
+            let zodType: any;
+            switch (value.type) {
+              case 'string': zodType = z.string(); break;
+              case 'number':
+              case 'integer': zodType = z.coerce.number(); break;
+              case 'boolean': zodType = z.coerce.boolean(); break;
+              default: zodType = z.any();
+            }
+            if (value.description) zodType = zodType.describe(value.description);
+            if (!tool.inputSchema.required?.includes(key)) zodType = zodType.optional();
+            return [key, zodType];
+          })
+        )
+      ),
+      execute: async (args: any) => {
+        const res = await fetch(`${WORKER_URL}/api/mcp/call/${sandboxId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ toolName: tool.name, args }),
+        });
+        return await res.json();
+      },
+    };
+  }
+
+  return tools;
+}
+
+// Main chat function
+async function chat(prompt: string) {
+  console.log('🔧 Fetching tools from worker...');
+  const tools = await getTools();
+  console.log(`✓ Loaded ${Object.keys(tools).length} tools:`, Object.keys(tools));
+
+  console.log('\n🤖 Starting chat...\n');
+
+  const neosantara = createOpenAI({
+    apiKey: process.env.NEOSANTARA_API_KEY!,
+    baseURL: 'https://api.neosantara.xyz/v1',
+  });
+
+  const result = streamText({
+    model: neosantara('neosantara/Meta-Llama-3.1-70B-Instruct-Turbo'),
+    prompt,
+    tools,
+    maxSteps: 10,
+  });
+
+  for await (const chunk of result.fullStream) {
+    switch (chunk.type) {
+      case 'text-delta':
+        process.stdout.write(chunk.textDelta);
+        break;
+      case 'tool-call':
+        console.log(`\n\n🔧 Calling: ${chunk.toolName}`);
+        console.log('📊 Args:', JSON.stringify(chunk.args, null, 2));
+        break;
+      case 'finish':
+        console.log('\n\n✓ Done');
+        break;
+    }
+  }
+}
+
+// Run
+chat('Search for the latest AI research papers and summarize the findings');
+```
+
+**Run:**
+
+```bash
+# Install dependencies
+npm install ai @ai-sdk/openai zod
+
+# Set environment variable
+export NEOSANTARA_API_KEY=nsk_your_key
+
+# Run
+npx tsx chat.ts
+```
+
+**Output:**
+
+```
+🔧 Fetching tools from worker...
+✓ Loaded 3 tools: ['tavily_search', 'arxiv_search', 'weather']
+
+🤖 Starting chat...
+
+🔧 Calling: tavily_search
+📊 Args: {
+  "query": "latest AI research papers 2024",
+  "max_results": 5
+}
+
+Based on my search, here are the latest AI research papers from 2024:
+
+1. **GPT-5: Next Generation Language Models**
+   Published: January 2024
+   Link: https://arxiv.org/abs/2401.xxxxx
+
+   This groundbreaking paper introduces...
+
+2. **Efficient Fine-tuning with LoRA 2.0**
+   ...
+
+✓ Done
+```
+
+---
+
+### Environment Variables Setup
+
+```bash
+# .env
+VITE_WORKER_URL=https://your-worker.workers.dev
+VITE_NEOSANTARA_API_KEY=nsk_your_key_here
+VITE_GROQ_API_KEY=gsk_your_key_here  # Optional
+```
+
+```typescript
+// vite.config.ts
+export default defineConfig({
+  define: {
+    'import.meta.env.VITE_WORKER_URL': JSON.stringify(process.env.VITE_WORKER_URL),
+  },
+});
+```
+
+---
+
+### Key Points
+
+1. **Worker URL**: Use your deployed worker URL (e.g., `https://your-worker.workers.dev`)
+2. **Session Management**: Call `/api/mcp/init` once to get `sandboxId`
+3. **Tool Fetching**: GET `/api/mcp/tools/{sandboxId}` returns available tools
+4. **Tool Execution**: POST `/api/mcp/call/{sandboxId}` with `{ toolName, args }`
+5. **Zod Conversion**: Convert JSON Schema → Zod for type safety
+6. **Reusability**: Create hooks/utilities for tool fetching
+
+**URL Structure:**
+
+```
+Worker Base: https://your-worker.workers.dev
+
+Endpoints:
+  POST /api/mcp/init
+    → Returns: { sandboxId, session }
+
+  GET /api/mcp/tools/{sandboxId}
+    → Returns: { tools: [...] }
+
+  POST /api/mcp/call/{sandboxId}
+    Body: { toolName, args }
+    → Returns: { result }
+```
+
+---
+
 ### Complete Working Example with Cloudflare Worker
 
 This demo shows how to use OpenAI SDK with tools deployed on Cloudflare Worker (e2b-mcp-api).
