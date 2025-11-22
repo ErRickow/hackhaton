@@ -66,34 +66,11 @@ export function useApiChat(): UseApiChatReturn {
     ];
     setMessages(newMessages);
 
-    // Create system prompt with tool info
-    console.log('🔍 Debug tools object:', tools);
-    console.log('🔍 Tools keys:', Object.keys(tools || {}));
+    // Use minimal system prompt (following zola-chat reference pattern)
+    // Empty or minimal prompts work better - the AI SDK handles tool invocation
+    console.log('🔍 Available tools:', Object.keys(tools || {}));
 
-    const toolList = Object.entries(tools || {})
-      .map(([name, toolObj]: [string, any]) => {
-        console.log(`🔍 Tool ${name}:`, typeof toolObj, toolObj);
-        // Try to access description - tool() helper might have different structure
-        const desc = toolObj?.description || toolObj?._def?.description || 'No description';
-        return `- ${name}: ${desc}`;
-      })
-      .join('\n');
-
-    console.log('📋 Tool list for prompt:', toolList);
-
-    const systemPrompt = `You are APILab AI - an API testing assistant with access to these tools:
-${toolList}
-
-CRITICAL RULES:
-1. When user asks to search, fetch, or get data → ALWAYS use the appropriate tool
-2. NEVER simulate or make up results - only use real tool outputs
-3. After calling a tool, show the actual result to the user
-
-Examples:
-- "Search for AI news" → Call duckduckgo_search(query="AI news")
-- "Find papers about ML" → Call arxiv(query="machine learning")
-
-You MUST use tools for all data requests. Do NOT respond with fake/example data.`;
+    const systemPrompt = `You are APILab AI - an API testing assistant.`;
 
     const messagesWithSystem: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
