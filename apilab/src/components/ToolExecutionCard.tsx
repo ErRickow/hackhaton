@@ -54,13 +54,13 @@ export function ToolExecutionCard({
   const getStatusColor = () => {
     switch (status) {
       case 'pending':
-        return 'border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30';
+        return 'border-2 border-amber-400 dark:border-amber-600 bg-amber-100 dark:bg-amber-900';
       case 'running':
-        return 'border-2 border-orange-400 dark:border-orange-600 bg-orange-50 dark:bg-orange-950/30 shadow-xl shadow-orange-500/30';
+        return 'border-2 border-orange-400 dark:border-orange-600 bg-orange-100 dark:bg-orange-900';
       case 'complete':
-        return 'border-2 border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-950/30 shadow-lg shadow-green-500/20';
+        return 'border-2 border-green-400 dark:border-green-600 bg-green-100 dark:bg-green-900';
       case 'error':
-        return 'border-2 border-red-400 dark:border-red-600 bg-red-50 dark:bg-red-950/30';
+        return 'border-2 border-red-400 dark:border-red-600 bg-red-100 dark:bg-red-900';
     }
   };
 
@@ -155,15 +155,15 @@ export function ToolExecutionCard({
           {/* Running message */}
           {status === 'running' && (
             <div className="space-y-2">
-              <p className="text-xs text-orange-700 dark:text-orange-300 italic flex items-center gap-2 font-medium">
+              <p className="text-xs text-orange-800 dark:text-orange-200 italic flex items-center gap-2 font-medium">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 {args && Object.keys(args).length > 0 ? 'Executing API call...' : 'Preparing tool call...'}
               </p>
               {/* Show progress dots */}
               <div className="flex gap-1.5">
-                <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce shadow-sm shadow-orange-500/50" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce shadow-sm shadow-orange-500/50" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce shadow-sm shadow-orange-500/50" style={{ animationDelay: '300ms' }} />
+                <div className="w-2 h-2 bg-orange-600 dark:bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-orange-600 dark:bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-orange-600 dark:bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           )}

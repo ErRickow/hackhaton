@@ -404,6 +404,43 @@ export function useMcpTools(): UseMcpToolsReturn {
           errorData = { error: errorText };
         }
 
+        // If sandbox not found (worker restarted), auto-reinitialize
+        if (response.status === 404 && errorData.error === 'Sandbox not found') {
+          console.warn('⚠️ Sandbox not found (worker restarted). Auto-reinitializing...');
+
+          // Clear current state
+          mcpServerRef.current = null;
+          setIsReady(false);
+
+          // Re-initialize
+          await startHttpClient();
+
+          // Retry the tool call with new sandbox
+          const newMcpServer = mcpServerRef.current;
+          if (newMcpServer && newMcpServer.sandboxId) {
+            const retryResponse = await fetch(`${newMcpServer.backendUrl}/api/mcp/call/${newMcpServer.sandboxId}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                toolName,
+                args
+              })
+            });
+
+            if (!retryResponse.ok) {
+              throw new Error(`Backend tool call error after reinit (${retryResponse.status})`);
+            }
+
+            const result = await retryResponse.json();
+            console.log('✓ MCP tool result (after reinit):', result);
+            return result;
+          } else {
+            throw new Error('Failed to reinitialize MCP server');
+          }
+        }
+
         const error = new Error(`Backend tool call error (${response.status}): ${errorData.error || response.statusText}`) as any;
         error.status = response.status;
         error.statusText = response.statusText;
