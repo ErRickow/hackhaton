@@ -67,9 +67,19 @@ export function useApiChat(): UseApiChatReturn {
     setMessages(newMessages);
 
     // Create system prompt with tool info
+    console.log('🔍 Debug tools object:', tools);
+    console.log('🔍 Tools keys:', Object.keys(tools || {}));
+
     const toolList = Object.entries(tools || {})
-      .map(([name, tool]: [string, any]) => `- ${name}: ${tool.description || 'No description'}`)
+      .map(([name, toolObj]: [string, any]) => {
+        console.log(`🔍 Tool ${name}:`, typeof toolObj, toolObj);
+        // Try to access description - tool() helper might have different structure
+        const desc = toolObj?.description || toolObj?._def?.description || 'No description';
+        return `- ${name}: ${desc}`;
+      })
       .join('\n');
+
+    console.log('📋 Tool list for prompt:', toolList);
 
     const systemPrompt = `You are APILab AI - an API testing assistant with access to these tools:
 ${toolList}

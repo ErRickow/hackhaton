@@ -27,8 +27,8 @@ export function useMcpTools(): UseMcpToolsReturn {
       const inputSchema = mcpTool.inputSchema ? convertJsonSchemaToZod(mcpTool.inputSchema) : z.object({});
 
       // Use AI SDK's tool() helper - this ensures correct type inference
-      aiTools[mcpTool.name] = tool({
-        description: mcpTool.description || '',
+      const toolDefinition = tool({
+        description: mcpTool.description || `Tool: ${mcpTool.name}`,
         parameters: inputSchema, // AI SDK tool() helper uses 'parameters' property
         execute: async (args) => {
           // ✅ Actually call the MCP tool via backend
@@ -55,6 +55,13 @@ export function useMcpTools(): UseMcpToolsReturn {
             throw error;
           }
         }
+      });
+
+      aiTools[mcpTool.name] = toolDefinition;
+      console.log(`✅ Registered tool: ${mcpTool.name}`, {
+        description: mcpTool.description,
+        hasParameters: !!inputSchema,
+        hasExecute: typeof toolDefinition === 'object'
       });
     }
 
