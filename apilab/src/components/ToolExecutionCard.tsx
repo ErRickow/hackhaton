@@ -41,26 +41,26 @@ export function ToolExecutionCard({
   const getStatusIcon = () => {
     switch (status) {
       case 'pending':
-        return <Loader2 className="h-4 w-4 text-yellow-500 animate-spin" />;
+        return <Loader2 className="h-4 w-4 text-yellow-600 dark:text-yellow-400 animate-spin" />;
       case 'running':
-        return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />;
+        return <Loader2 className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-spin" />;
       case 'complete':
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+        return <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />;
       case 'error':
-        return <XCircle className="h-4 w-4 text-red-500" />;
+        return <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />;
     }
   };
 
   const getStatusColor = () => {
     switch (status) {
       case 'pending':
-        return 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/20';
+        return 'border-2 border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950/30';
       case 'running':
-        return 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20';
+        return 'border-2 border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-950/30 shadow-lg shadow-blue-500/20';
       case 'complete':
-        return 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20';
+        return 'border-2 border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-950/30';
       case 'error':
-        return 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20';
+        return 'border-2 border-red-400 dark:border-red-600 bg-red-50 dark:bg-red-950/30';
     }
   };
 

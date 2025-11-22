@@ -7,6 +7,10 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'monospace'],
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -40,6 +44,12 @@ export default {
         card: {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
+        },
+        // Custom tool colors for better clarity
+        tool: {
+          running: '#3B82F6',  // Blue
+          complete: '#10B981', // Green
+          error: '#EF4444',    // Red
         },
       },
       borderRadius: {

@@ -51,26 +51,26 @@ function App() {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Minimal Header */}
-      <header className="border-b px-4 py-3 flex items-center justify-between flex-shrink-0">
+      <header className="border-b border-blue-100 dark:border-blue-900 px-4 py-3 flex items-center justify-between flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/30 flex items-center justify-center">
               <span className="text-white font-bold text-sm">AL</span>
             </div>
-            <h1 className="text-lg font-semibold">APILab</h1>
+            <h1 className="text-lg font-bold bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">APILab</h1>
           </div>
 
           {/* Status Indicator (Minimal) */}
           {isStarting && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-xs text-blue-700 dark:text-blue-300 font-medium">
               <Loader2 className="h-3 w-3 animate-spin" />
-              <span>Starting...</span>
+              <span>Starting MCP...</span>
             </div>
           )}
           {isReady && (
-            <div className="flex items-center gap-1.5">
-              <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-              <span className="text-xs text-muted-foreground">Ready</span>
+            <div className="flex items-center gap-1.5 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full">
+              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-xs text-green-700 dark:text-green-300 font-semibold">Ready</span>
             </div>
           )}
         </div>
@@ -79,7 +79,7 @@ function App() {
           variant="ghost"
           size="icon"
           onClick={() => setShowSettings(true)}
-          className="h-9 w-9"
+          className="h-9 w-9 hover:bg-blue-100 dark:hover:bg-blue-900/30"
         >
           <SettingsIcon className="h-4 w-4" />
         </Button>
@@ -131,18 +131,22 @@ function App() {
           {/* Welcome Message */}
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center space-y-4 py-12">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mb-2">
-                <span className="text-white font-bold text-2xl">AL</span>
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 shadow-2xl shadow-blue-500/40 flex items-center justify-center mb-2">
+                <span className="text-white font-bold text-3xl">AL</span>
               </div>
               <div>
-                <h2 className="text-xl font-semibold mb-1">Welcome to APILab</h2>
-                <p className="text-sm text-muted-foreground max-w-md">
-                  Test any API with plain English. Powered by E2B MCP servers.
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent mb-2">
+                  Welcome to APILab
+                </h2>
+                <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
+                  AI Assistant with access to <span className="font-semibold text-blue-600 dark:text-blue-400">real-time tools</span>
+                  <br />
+                  Powered by E2B MCP Servers • Neosantara AI
                 </p>
               </div>
 
               {/* Example Prompts */}
-              <div className="flex flex-wrap gap-2 justify-center mt-4">
+              <div className="flex flex-wrap gap-2 justify-center mt-6">
                 {[
                   'Search for latest AI news',
                   'Find papers about machine learning',
@@ -159,7 +163,7 @@ function App() {
                       } as any)
                       setTimeout(() => handleSubmit(event), 100)
                     }}
-                    className="text-xs"
+                    className="text-xs border-2 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:border-blue-400 dark:hover:border-blue-600 transition-all font-medium"
                   >
                     {example}
                   </Button>
@@ -171,37 +175,43 @@ function App() {
           {/* Messages */}
           {messages.length > 0 && (
             <div className="space-y-6">
-              {messages.map((message, index) => (
-                <ChatMessage
-                  key={index}
-                  role={message.role}
-                  content={message.content}
-                  isStreaming={isLoading && index === messages.length - 1}
-                />
-              ))}
+              {messages.map((message, index) => {
+                const isLastAssistantMessage = message.role === 'assistant' && index === messages.length - 1;
 
-              {/* Tool Executions - Always visible during loading */}
-              {toolExecutions.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-200 dark:via-purple-800 to-transparent"></div>
-                    <span className="text-xs font-medium text-purple-600 dark:text-purple-400">Tool Executions</span>
-                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-200 dark:via-purple-800 to-transparent"></div>
-                  </div>
-                  {toolExecutions.map((execution) => (
-                    <ToolExecutionCard
-                      key={execution.id}
-                      toolName={execution.toolName}
-                      status={execution.status}
-                      args={execution.args}
-                      result={execution.result}
-                      error={execution.error}
-                      startTime={execution.startTime}
-                      endTime={execution.endTime}
+                return (
+                  <div key={index}>
+                    {/* Show tool executions ABOVE the last assistant message */}
+                    {isLastAssistantMessage && toolExecutions.length > 0 && (
+                      <div className="space-y-3 mb-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-blue-300 dark:via-blue-700 to-transparent"></div>
+                          <span className="text-xs font-semibold text-blue-700 dark:text-blue-300 tracking-wide">🔧 TOOL EXECUTIONS</span>
+                          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-blue-300 dark:via-blue-700 to-transparent"></div>
+                        </div>
+                        {toolExecutions.map((execution) => (
+                          <ToolExecutionCard
+                            key={execution.id}
+                            toolName={execution.toolName}
+                            status={execution.status}
+                            args={execution.args}
+                            result={execution.result}
+                            error={execution.error}
+                            startTime={execution.startTime}
+                            endTime={execution.endTime}
+                          />
+                        ))}
+                        <div className="h-px bg-gradient-to-r from-transparent via-gray-200 dark:via-gray-700 to-transparent my-4"></div>
+                      </div>
+                    )}
+
+                    <ChatMessage
+                      role={message.role}
+                      content={message.content}
+                      isStreaming={isLoading && index === messages.length - 1}
                     />
-                  ))}
-                </div>
-              )}
+                  </div>
+                );
+              })}
 
               <div ref={messagesEndRef} />
             </div>
@@ -239,7 +249,7 @@ function App() {
             </Button>
           </form>
           <p className="text-xs text-muted-foreground text-center mt-2">
-            Powered by E2B Sandboxes • MCP Servers
+            AI with real-time tool access • E2B MCP • Neosantara
           </p>
         </div>
       </div>
