@@ -57,7 +57,8 @@ export function getModelName(provider: LLMProvider = 'neosantara'): string {
   if (provider === 'neosantara') {
     return 'nusantara-base'; // Supports function calling
   } else {
-    return 'llama-3.1-8b-instant'; // Groq model
+    // Use Groq's specialized tool-use model for better function calling support
+    return 'llama3-groq-70b-8192-tool-use-preview';
   }
 }
 
@@ -107,8 +108,12 @@ export async function streamChatCompletion(
     const llmProvider = createLLMProvider(provider);
     const modelName = getModelName(provider);
 
-    console.log(`🤖 Using ${provider} with model: ${modelName}`);
-    console.log(`🔧 Tools available: ${Object.keys(tools || {}).length}`);
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`🤖 LLM Provider: ${provider}`);
+    console.log(`📝 Model: ${modelName}`);
+    console.log(`🔧 Tools Count: ${Object.keys(tools || {}).length}`);
+    console.log(`🔧 Available Tools:`, Object.keys(tools || {}));
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
     // Format messages for AI SDK
     const formattedMessages = messages

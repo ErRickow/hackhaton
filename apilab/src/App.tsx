@@ -180,9 +180,14 @@ function App() {
                 />
               ))}
 
-              {/* Tool Executions */}
+              {/* Tool Executions - Always visible during loading */}
               {toolExecutions.length > 0 && (
                 <div className="space-y-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-200 dark:via-purple-800 to-transparent"></div>
+                    <span className="text-xs font-medium text-purple-600 dark:text-purple-400">Tool Executions</span>
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-200 dark:via-purple-800 to-transparent"></div>
+                  </div>
                   {toolExecutions.map((execution) => (
                     <ToolExecutionCard
                       key={execution.id}
