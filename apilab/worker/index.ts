@@ -34,7 +34,81 @@ const sandboxCache = new Map<string, {
   sandbox: any;
   mcpUrl: string;
   mcpToken: string;
+  initialized: boolean;
 }>();
+
+/**
+ * Initialize MCP session with proper handshake
+ * MCP protocol requires: initialize request → initialized notification
+ */
+async function initializeMcpSession(mcpUrl: string, mcpToken: string) {
+  console.log('🤝 Initializing MCP session...');
+
+  // Step 1: Send initialize request
+  const initResponse = await fetch(mcpUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
+      'Authorization': `Bearer ${mcpToken}`,
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2024-11-05',
+        capabilities: {
+          tools: {},
+        },
+        clientInfo: {
+          name: 'apilab-worker',
+          version: '1.0.0',
+        },
+      },
+    }),
+  });
+
+  console.log('   Initialize response:', initResponse.status);
+
+  if (!initResponse.ok) {
+    const errorText = await initResponse.text();
+    throw new Error(`MCP initialize failed: ${initResponse.status} - ${errorText}`);
+  }
+
+  // Parse response (may be SSE or JSON)
+  const contentType = initResponse.headers.get('content-type') || '';
+  const responseText = await initResponse.text();
+
+  let initData;
+  if (contentType.includes('text/event-stream') || responseText.startsWith('event:')) {
+    const dataMatch = responseText.match(/data:\s*({.*})/);
+    if (dataMatch) {
+      initData = JSON.parse(dataMatch[1]);
+    }
+  } else {
+    initData = JSON.parse(responseText);
+  }
+
+  console.log('   Server capabilities:', JSON.stringify(initData.result).substring(0, 200));
+
+  // Step 2: Send initialized notification (no response expected)
+  await fetch(mcpUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
+      'Authorization': `Bearer ${mcpToken}`,
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'notifications/initialized',
+      params: {},
+    }),
+  });
+
+  console.log('✅ MCP session initialized');
+}
 
 /**
  * Create E2B sandbox with MCP gateway
@@ -58,12 +132,16 @@ async function createMcpSandbox(apiKey: string, mcpServers: Record<string, any>)
   console.log('✅ Sandbox created successfully!');
   console.log('🔗 MCP URL:', mcpUrl);
 
+  // Initialize MCP session with proper handshake
+  await initializeMcpSession(mcpUrl, mcpToken);
+
   // Cache the sandbox with MCP info
   const sandboxId = (sandbox as any).id || Date.now().toString();
   sandboxCache.set(sandboxId, {
     sandbox,
     mcpUrl,
     mcpToken,
+    initialized: true,
   });
 
   return {
