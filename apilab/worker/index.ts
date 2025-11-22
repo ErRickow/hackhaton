@@ -181,9 +181,30 @@ export default {
           throw new Error(`MCP gateway error: ${mcpResponse.status} ${mcpResponse.statusText} - ${errorText}`);
         }
 
-        // MCP JSON-RPC response structure: { jsonrpc: "2.0", id: ..., result: { tools: [...] } }
-        const mcpData = await mcpResponse.json();
-        console.log('   Response:', JSON.stringify(mcpData).substring(0, 300));
+        // MCP gateway may return SSE or JSON format
+        const contentType = mcpResponse.headers.get('content-type') || '';
+        const responseText = await mcpResponse.text();
+        console.log('   Content-Type:', contentType);
+        console.log('   Response preview:', responseText.substring(0, 100));
+
+        let mcpData;
+
+        // Parse SSE format if needed
+        if (contentType.includes('text/event-stream') || responseText.startsWith('event:')) {
+          console.log('   Parsing as SSE format');
+          // SSE format: "event: message\ndata: {...}\n\n"
+          const dataMatch = responseText.match(/data:\s*({.*})/);
+          if (dataMatch) {
+            mcpData = JSON.parse(dataMatch[1]);
+          } else {
+            throw new Error('Failed to parse SSE response');
+          }
+        } else {
+          console.log('   Parsing as JSON format');
+          mcpData = JSON.parse(responseText);
+        }
+
+        console.log('   Parsed data:', JSON.stringify(mcpData).substring(0, 300));
 
         // Check for JSON-RPC error
         if (mcpData.error) {
@@ -265,9 +286,30 @@ export default {
           throw new Error(`MCP gateway error: ${mcpResponse.status} ${mcpResponse.statusText} - ${errorText}`);
         }
 
-        // MCP JSON-RPC response structure: { jsonrpc: "2.0", id: ..., result: {...} }
-        const mcpData = await mcpResponse.json();
-        console.log('   Response:', JSON.stringify(mcpData).substring(0, 500));
+        // MCP gateway may return SSE or JSON format
+        const contentType = mcpResponse.headers.get('content-type') || '';
+        const responseText = await mcpResponse.text();
+        console.log('   Content-Type:', contentType);
+        console.log('   Response preview:', responseText.substring(0, 100));
+
+        let mcpData;
+
+        // Parse SSE format if needed
+        if (contentType.includes('text/event-stream') || responseText.startsWith('event:')) {
+          console.log('   Parsing as SSE format');
+          // SSE format: "event: message\ndata: {...}\n\n"
+          const dataMatch = responseText.match(/data:\s*({.*})/);
+          if (dataMatch) {
+            mcpData = JSON.parse(dataMatch[1]);
+          } else {
+            throw new Error('Failed to parse SSE response');
+          }
+        } else {
+          console.log('   Parsing as JSON format');
+          mcpData = JSON.parse(responseText);
+        }
+
+        console.log('   Parsed data:', JSON.stringify(mcpData).substring(0, 500));
 
         // Check for JSON-RPC error
         if (mcpData.error) {
