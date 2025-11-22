@@ -66,9 +66,14 @@ export function useMcpTools(): UseMcpToolsReturn {
               // Backend returns { result: actualData, isError: false }
               // AI SDK expects just the actualData, not wrapped
               if (response && typeof response === 'object' && 'result' in response) {
-                // Check for errors
+                // Check for errors - throw with clear message for AI to understand
                 if (response.isError) {
-                  throw new Error(JSON.stringify(response.result));
+                  const errorMsg = typeof response.result === 'string'
+                    ? response.result
+                    : JSON.stringify(response.result, null, 2);
+
+                  // Throw with detailed error message that AI can understand
+                  throw new Error(`Tool execution failed: ${errorMsg}\n\nPlease try with different parameters or inform the user about the error.`);
                 }
 
                 // MCP tools return data in format: { content: [{ type: "text", text: "..." }] }
@@ -95,7 +100,10 @@ export function useMcpTools(): UseMcpToolsReturn {
               return response;
             } catch (error) {
               console.error(`❌ Tool ${mcpTool.name} execution failed:`, error);
-              throw error;
+
+              // Re-throw with enhanced error message for AI to understand
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              throw new Error(`System Error in ${mcpTool.name}: ${errorMessage}\n\nPlease inform the user about this error and suggest alternatives.`);
             }
           }
         });
@@ -156,7 +164,9 @@ export function useMcpTools(): UseMcpToolsReturn {
           break;
         case 'number':
         case 'integer':
-          zodType = z.number();
+          // IMPORTANT: Coerce strings to numbers (LLMs often send wrong types)
+          // This allows "10" to be auto-converted to 10
+          zodType = z.coerce.number();
           // Handle min/max
           if (typeof value.minimum === 'number') {
             zodType = (zodType as z.ZodNumber).min(value.minimum);
@@ -166,7 +176,8 @@ export function useMcpTools(): UseMcpToolsReturn {
           }
           break;
         case 'boolean':
-          zodType = z.boolean();
+          // IMPORTANT: Coerce to boolean (LLMs might send "true"/"false" strings)
+          zodType = z.coerce.boolean();
           break;
         case 'array':
           // Handle array items
