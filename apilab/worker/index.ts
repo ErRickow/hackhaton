@@ -141,7 +141,7 @@ export default {
       });
     }
 
-    // List MCP tools (using direct HTTP fetch to MCP gateway)
+    // List MCP tools (using MCP JSON-RPC protocol)
     if (url.pathname.startsWith('/api/mcp/tools/') && request.method === 'GET') {
       const sandboxId = url.pathname.split('/').pop();
       const cached = sandboxCache.get(sandboxId || '');
@@ -153,29 +153,15 @@ export default {
       try {
         console.log('📋 Listing MCP tools for sandbox:', sandboxId);
         console.log('   MCP URL:', cached.mcpUrl);
-        console.log('   Has token:', !!cached.mcpToken);
+        console.log('   Token:', cached.mcpToken.substring(0, 10) + '...');
 
-        // Use E2B SDK's MCP client methods instead of direct HTTP
-        // E2B provides mcpClient.listTools() method
-        if (cached.sandbox.mcp) {
-          console.log('Using E2B SDK MCP client methods');
-          const tools = await cached.sandbox.mcp.listTools();
-          console.log(`✅ Found ${tools.length} tools via SDK`);
-
-          return corsResponse({
-            tools,
-            count: tools.length
-          });
-        }
-
-        // Fallback: Fetch tools directly from MCP gateway using JSON-RPC over HTTP
-        console.log('Fallback: Using direct HTTP to MCP gateway');
+        // Use MCP JSON-RPC protocol to list tools
+        // Based on E2B examples: client.listTools() sends tools/list JSON-RPC request
         const mcpResponse = await fetch(cached.mcpUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${cached.mcpToken}`,
-            'Accept': 'application/json, text/event-stream',
           },
           body: JSON.stringify({
             jsonrpc: '2.0',
@@ -193,41 +179,26 @@ export default {
           throw new Error(`MCP gateway error: ${mcpResponse.status} ${mcpResponse.statusText} - ${errorText}`);
         }
 
-        const contentType = mcpResponse.headers.get('content-type') || '';
-        console.log('   Response content-type:', contentType);
+        // MCP JSON-RPC response structure: { jsonrpc: "2.0", id: ..., result: { tools: [...] } }
+        const mcpData = await mcpResponse.json();
+        console.log('   Response:', JSON.stringify(mcpData).substring(0, 300));
 
-        // Get full response text for debugging
-        const responseText = await mcpResponse.text();
-        console.log('   Response body (first 500 chars):', responseText.substring(0, 500));
-
-        let mcpData;
-
-        // Handle SSE response if gateway sends it
-        if (contentType.includes('text/event-stream')) {
-          console.log('   Parsing SSE format...');
-
-          // Parse SSE format: "data: {...}\n\n"
-          const dataMatch = responseText.match(/data: (.*?)(?:\n|$)/);
-          if (dataMatch) {
-            mcpData = JSON.parse(dataMatch[1]);
-            console.log('   Parsed SSE data:', JSON.stringify(mcpData).substring(0, 200));
-          } else {
-            throw new Error('Failed to parse SSE response - no data match found');
-          }
-        } else {
-          // Handle regular JSON response
-          console.log('   Parsing JSON format...');
-          mcpData = JSON.parse(responseText);
+        // Check for JSON-RPC error
+        if (mcpData.error) {
+          console.error('   MCP JSON-RPC error:', mcpData.error);
+          throw new Error(`MCP error: ${mcpData.error.message || JSON.stringify(mcpData.error)}`);
         }
 
+        // Extract tools from result
         const tools = mcpData.result?.tools || [];
         console.log(`✅ Found ${tools.length} tools`);
 
         if (tools.length > 0) {
-          console.log('   First tool:', JSON.stringify(tools[0]));
+          console.log('   Tools:', tools.map((t: any) => t.name).join(', '));
+          console.log('   First tool detail:', JSON.stringify(tools[0]));
         } else {
           console.warn('   ⚠️ No tools found!');
-          console.warn('   MCP data structure:', JSON.stringify(mcpData));
+          console.warn('   Full response:', JSON.stringify(mcpData));
         }
 
         return corsResponse({
@@ -243,7 +214,7 @@ export default {
       }
     }
 
-    // Call MCP tool (using direct HTTP fetch to MCP gateway)
+    // Call MCP tool (using MCP JSON-RPC protocol)
     if (url.pathname.startsWith('/api/mcp/call/') && request.method === 'POST') {
       const sandboxId = url.pathname.split('/').pop();
       const cached = sandboxCache.get(sandboxId || '');
@@ -260,30 +231,16 @@ export default {
           return corsResponse({ error: 'toolName is required' }, 400);
         }
 
-        console.log(`🔧 Calling tool: ${toolName}`, JSON.stringify(args));
+        console.log(`🔧 Calling tool: ${toolName}`);
+        console.log('   Args:', JSON.stringify(args));
 
-        // Use E2B SDK's MCP client methods instead of direct HTTP
-        if (cached.sandbox.mcp) {
-          console.log('Using E2B SDK MCP client callTool method');
-          const result = await cached.sandbox.mcp.callTool(toolName, args || {});
-          console.log('✅ Tool call successful via SDK');
-          console.log('   Result type:', typeof result);
-          console.log('   Result:', JSON.stringify(result).substring(0, 200));
-
-          return corsResponse({
-            result: result,
-            isError: false
-          });
-        }
-
-        // Fallback: Call tool directly via MCP gateway using JSON-RPC over HTTP
-        console.log('Fallback: Using direct HTTP to MCP gateway');
+        // Use MCP JSON-RPC protocol to call tool
+        // Based on E2B examples: client.callTool(name, arguments) sends tools/call JSON-RPC request
         const mcpResponse = await fetch(cached.mcpUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${cached.mcpToken}`,
-            'Accept': 'application/json, text/event-stream',
           },
           body: JSON.stringify({
             jsonrpc: '2.0',
@@ -304,43 +261,28 @@ export default {
           throw new Error(`MCP gateway error: ${mcpResponse.status} ${mcpResponse.statusText} - ${errorText}`);
         }
 
-        const contentType = mcpResponse.headers.get('content-type') || '';
-        console.log('   Response content-type:', contentType);
+        // MCP JSON-RPC response structure: { jsonrpc: "2.0", id: ..., result: {...} }
+        const mcpData = await mcpResponse.json();
+        console.log('   Response:', JSON.stringify(mcpData).substring(0, 500));
 
-        // Get full response text for debugging
-        const responseText = await mcpResponse.text();
-        console.log('   Response body (first 500 chars):', responseText.substring(0, 500));
-
-        let mcpData;
-        // Handle SSE response if gateway sends it
-        if (contentType.includes('text/event-stream')) {
-          console.log('   Parsing SSE format...');
-
-          // Parse SSE format: "data: {...}\n\n"
-          const dataMatch = responseText.match(/data: (.*?)(?:\n|$)/);
-          if (dataMatch) {
-            mcpData = JSON.parse(dataMatch[1]);
-            console.log('   Parsed SSE data:', JSON.stringify(mcpData).substring(0, 200));
-          } else {
-            throw new Error('Failed to parse SSE response - no data match found');
-          }
-        } else {
-          // Handle regular JSON response
-          console.log('   Parsing JSON format...');
-          mcpData = JSON.parse(responseText);
+        // Check for JSON-RPC error
+        if (mcpData.error) {
+          console.error('   MCP JSON-RPC error:', mcpData.error);
+          return corsResponse({
+            result: { error: mcpData.error.message || JSON.stringify(mcpData.error) },
+            isError: true
+          }, 200);
         }
 
+        // Extract result - MCP returns { content: [...], isError: boolean }
         const result = mcpData.result;
         console.log('✅ Tool call successful');
-        console.log('   Result structure:', {
-          hasContent: 'content' in (result || {}),
-          hasIsError: 'isError' in (result || {}),
-          resultType: typeof result
-        });
+        console.log('   Result type:', typeof result);
+        console.log('   Has content:', 'content' in (result || {}));
 
         return corsResponse({
-          result: result?.content || result,
-          isError: result?.isError || false
+          result: result,
+          isError: false
         });
       } catch (error: any) {
         console.error('❌ Failed to call tool:', error);
