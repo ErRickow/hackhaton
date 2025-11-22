@@ -92,8 +92,8 @@ async function initializeMcpSession(mcpUrl: string, mcpToken: string) {
 
   console.log('   Server capabilities:', JSON.stringify(initData.result).substring(0, 200));
 
-  // Step 2: Send initialized notification (no response expected)
-  await fetch(mcpUrl, {
+  // Step 2: Send initialized notification (no params field for notifications!)
+  const notifyResponse = await fetch(mcpUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -103,9 +103,14 @@ async function initializeMcpSession(mcpUrl: string, mcpToken: string) {
     body: JSON.stringify({
       jsonrpc: '2.0',
       method: 'notifications/initialized',
-      params: {},
     }),
   });
+
+  console.log('   Initialized notification sent:', notifyResponse.status);
+
+  // Small delay to ensure server processes the notification
+  // (MCP gateway might need time to transition out of init state)
+  await new Promise(resolve => setTimeout(resolve, 100));
 
   console.log('✅ MCP session initialized');
 }
