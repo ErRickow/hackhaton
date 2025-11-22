@@ -34,10 +34,10 @@ function App() {
     if (!showError) return
 
     const errorText = JSON.stringify({
+      ...showError,
       message: showError.message,
       name: showError.name,
-      stack: showError.stack,
-      ...showError
+      stack: showError.stack
     }, null, 2)
 
     navigator.clipboard.writeText(errorText).then(() => {
@@ -113,10 +113,10 @@ function App() {
               <div className="bg-black/5 dark:bg-black/20 rounded p-2 overflow-x-auto max-h-96 overflow-y-auto">
                 <pre className="text-xs font-mono text-destructive whitespace-pre-wrap break-all">
                   {JSON.stringify({
+                    ...showError,
                     message: showError.message,
                     name: showError.name,
-                    stack: showError.stack,
-                    ...showError
+                    stack: showError.stack
                   }, null, 2)}
                 </pre>
               </div>

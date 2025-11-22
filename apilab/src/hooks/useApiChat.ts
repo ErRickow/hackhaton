@@ -22,7 +22,7 @@ export interface ToolExecution {
 }
 
 export function useApiChat(): UseApiChatReturn {
-  const { isReady, tools, callTool } = useMcpTools();
+  const { isReady, tools } = useMcpTools();
   const { apiKeys } = useApiKeys();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');

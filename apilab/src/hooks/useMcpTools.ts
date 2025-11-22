@@ -182,7 +182,8 @@ export function useMcpTools(): UseMcpToolsReturn {
         case 'array':
           // Handle array items
           if (value.items) {
-            const itemSchema = convertJsonSchemaToZod({ properties: { item: value.items }, required: [] });
+            // TODO: Use itemSchema for proper validation
+            // const itemSchema = convertJsonSchemaToZod({ properties: { item: value.items }, required: [] });
             zodType = z.array(z.any()); // Simplified for now
           } else {
             zodType = z.array(z.any());

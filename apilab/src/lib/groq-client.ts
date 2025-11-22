@@ -101,7 +101,7 @@ export async function streamChatCompletion(
   onComplete: () => void,
   onError: (error: Error) => void,
   onToolCallStart?: ToolCallStartHandler,
-  onToolCallComplete?: ToolCallCompleteHandler,
+  _onToolCallComplete?: ToolCallCompleteHandler, // TODO: Use with experimental_onToolCall
   provider: LLMProvider = 'neosantara'
 ) {
   try {
@@ -180,17 +180,11 @@ export async function streamChatCompletion(
             onToolCallStart?.(chunk.toolCallId, chunk.toolName, chunk.args);
             break;
 
-          case 'tool-result':
-            // Tool call completed
-            const toolCall = toolCallsMap.get(chunk.toolCallId);
-            if (toolCall) {
-              console.log(`✅ Tool call completed: ${toolCall.name}`);
-              onToolCallComplete?.(chunk.toolCallId, toolCall.name, chunk.result);
-            }
-            break;
+          // NOTE: 'tool-result' type removed in newer AI SDK versions
+          // Tool completion is now handled via experimental_onToolCall callbacks
 
           case 'step-finish':
-            console.log(`📊 Step finished - ${chunk.toolCalls?.length || 0} tool calls`);
+            console.log(`📊 Step finished`);
             break;
 
           case 'finish':
