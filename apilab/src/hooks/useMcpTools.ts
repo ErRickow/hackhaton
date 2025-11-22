@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import type { UseMcpToolsReturn } from '@/types';
 import { z } from 'zod';
+import { tool } from 'ai';
 
 export function useMcpTools(): UseMcpToolsReturn {
   const [mcpServer, setMcpServer] = useState<any>(null);
@@ -16,37 +17,53 @@ export function useMcpTools(): UseMcpToolsReturn {
 
   /**
    * Convert MCP SDK tools to AI SDK format
+   * Uses AI SDK's tool() helper for correct type inference
    */
   function convertMcpToolsToAiSdk(mcpTools: any[], callToolFn: (name: string, args: any) => Promise<any>): Record<string, any> {
     const aiTools: Record<string, any> = {};
 
-    for (const tool of mcpTools) {
-      // Convert MCP tool schema to AI SDK tool format
-      const parameters = tool.inputSchema ? convertJsonSchemaToZod(tool.inputSchema) : z.object({});
+    for (const mcpTool of mcpTools) {
+      // Convert MCP tool schema to Zod schema
+      const inputSchema = mcpTool.inputSchema ? convertJsonSchemaToZod(mcpTool.inputSchema) : z.object({});
 
-      aiTools[tool.name] = {
-        description: tool.description || '',
-        parameters,
-        execute: async (args: any) => {
+      // Use AI SDK's tool() helper - this ensures correct type inference
+      aiTools[mcpTool.name] = tool({
+        description: mcpTool.description || '',
+        parameters: inputSchema, // AI SDK tool() helper uses 'parameters' property
+        execute: async (args) => {
           // ✅ Actually call the MCP tool via backend
-          console.log(`🔧 Executing MCP tool: ${tool.name}`, args);
+          console.log(`🔧 Executing MCP tool: ${mcpTool.name}`, args);
           try {
-            const result = await callToolFn(tool.name, args);
-            console.log(`✅ Tool ${tool.name} executed successfully`);
-            return result;
+            const response = await callToolFn(mcpTool.name, args);
+            console.log(`✅ Tool ${mcpTool.name} executed successfully`, response);
+
+            // Backend returns { result: actualData, isError: false }
+            // AI SDK expects just the actualData, not wrapped
+            if (response && typeof response === 'object' && 'result' in response) {
+              // Check for errors
+              if (response.isError) {
+                throw new Error(JSON.stringify(response.result));
+              }
+              // Return unwrapped result
+              return response.result;
+            }
+
+            // Fallback: return as-is if not wrapped
+            return response;
           } catch (error) {
-            console.error(`❌ Tool ${tool.name} execution failed:`, error);
+            console.error(`❌ Tool ${mcpTool.name} execution failed:`, error);
             throw error;
           }
         }
-      };
+      });
     }
 
     return aiTools;
   }
 
   /**
-   * Convert JSON Schema to Zod schema (simplified)
+   * Convert JSON Schema to Zod schema with descriptions
+   * Descriptions help the LLM understand how to use each parameter
    */
   function convertJsonSchemaToZod(schema: any): z.ZodType<any> {
     if (!schema || !schema.properties) {
@@ -57,6 +74,7 @@ export function useMcpTools(): UseMcpToolsReturn {
 
     for (const [key, value] of Object.entries(schema.properties as Record<string, any>)) {
       const isRequired = schema.required?.includes(key) ?? false;
+      const description = value.description || '';
 
       let zodType: z.ZodType<any>;
 
@@ -78,6 +96,11 @@ export function useMcpTools(): UseMcpToolsReturn {
           break;
         default:
           zodType = z.any();
+      }
+
+      // Add description if available (helps LLM understand the parameter)
+      if (description) {
+        zodType = zodType.describe(description);
       }
 
       shape[key] = isRequired ? zodType : zodType.optional();
