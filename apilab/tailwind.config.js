@@ -45,9 +45,23 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
-        // Custom tool colors for better clarity
+        // Orange & White theme
+        brand: {
+          orange: {
+            50: '#FFF7ED',
+            100: '#FFEDD5',
+            200: '#FED7AA',
+            300: '#FDBA74',
+            400: '#FB923C',
+            500: '#F97316',
+            600: '#EA580C',
+            700: '#C2410C',
+            800: '#9A3412',
+            900: '#7C2D12',
+          }
+        },
         tool: {
-          running: '#3B82F6',  // Blue
+          running: '#F97316',  // Orange
           complete: '#10B981', // Green
           error: '#EF4444',    // Red
         },

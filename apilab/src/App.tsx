@@ -51,25 +51,25 @@ function App() {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Minimal Header */}
-      <header className="border-b border-blue-100 dark:border-blue-900 px-4 py-3 flex items-center justify-between flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
+      <header className="border-b border-orange-200 dark:border-orange-900/50 px-4 py-3 flex items-center justify-between flex-shrink-0 bg-gradient-to-r from-orange-50 via-white to-orange-50 dark:from-orange-950/20 dark:via-background dark:to-orange-950/20">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 shadow-lg shadow-blue-500/30 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">AL</span>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 shadow-xl shadow-orange-500/40 flex items-center justify-center">
+              <span className="text-white font-bold text-base">AL</span>
             </div>
-            <h1 className="text-lg font-bold bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">APILab</h1>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-orange-700 dark:from-orange-400 dark:to-orange-500 bg-clip-text text-transparent">APILab</h1>
           </div>
 
           {/* Status Indicator (Minimal) */}
           {isStarting && (
-            <div className="flex items-center gap-1.5 text-xs text-blue-700 dark:text-blue-300 font-medium">
+            <div className="flex items-center gap-1.5 text-xs text-orange-700 dark:text-orange-300 font-medium">
               <Loader2 className="h-3 w-3 animate-spin" />
               <span>Starting MCP...</span>
             </div>
           )}
           {isReady && (
-            <div className="flex items-center gap-1.5 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full">
-              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            <div className="flex items-center gap-1.5 bg-green-100 dark:bg-green-900/30 px-2.5 py-1 rounded-full border border-green-300 dark:border-green-700">
+              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse shadow-sm shadow-green-500/50" />
               <span className="text-xs text-green-700 dark:text-green-300 font-semibold">Ready</span>
             </div>
           )}
@@ -79,9 +79,9 @@ function App() {
           variant="ghost"
           size="icon"
           onClick={() => setShowSettings(true)}
-          className="h-9 w-9 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+          className="h-9 w-9 hover:bg-orange-100 dark:hover:bg-orange-900/30"
         >
-          <SettingsIcon className="h-4 w-4" />
+          <SettingsIcon className="h-4 w-4 text-orange-700 dark:text-orange-300" />
         </Button>
       </header>
 
@@ -130,23 +130,23 @@ function App() {
 
           {/* Welcome Message */}
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center space-y-4 py-12">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 shadow-2xl shadow-blue-500/40 flex items-center justify-center mb-2">
-                <span className="text-white font-bold text-3xl">AL</span>
+            <div className="flex flex-col items-center justify-center h-full text-center space-y-6 py-12">
+              <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-orange-500 to-orange-600 shadow-2xl shadow-orange-500/50 flex items-center justify-center mb-2 ring-4 ring-orange-100 dark:ring-orange-900/30">
+                <span className="text-white font-bold text-4xl">AL</span>
               </div>
-              <div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent mb-2">
+              <div className="space-y-3">
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-orange-700 dark:from-orange-400 dark:to-orange-500 bg-clip-text text-transparent">
                   Welcome to APILab
                 </h2>
-                <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
-                  AI Assistant with access to <span className="font-semibold text-blue-600 dark:text-blue-400">real-time tools</span>
+                <p className="text-base text-muted-foreground max-w-lg leading-relaxed px-4">
+                  AI Assistant with access to <span className="font-bold text-orange-600 dark:text-orange-400">real-time tools</span>
                   <br />
-                  Powered by E2B MCP Servers • Neosantara AI
+                  <span className="text-sm">Powered by E2B MCP Servers • Neosantara AI</span>
                 </p>
               </div>
 
               {/* Example Prompts */}
-              <div className="flex flex-wrap gap-2 justify-center mt-6">
+              <div className="flex flex-wrap gap-3 justify-center mt-8">
                 {[
                   'Search for latest AI news',
                   'Find papers about machine learning',
@@ -163,7 +163,7 @@ function App() {
                       } as any)
                       setTimeout(() => handleSubmit(event), 100)
                     }}
-                    className="text-xs border-2 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:border-blue-400 dark:hover:border-blue-600 transition-all font-medium"
+                    className="text-sm border-2 border-orange-200 dark:border-orange-800 hover:bg-orange-50 dark:hover:bg-orange-950/30 hover:border-orange-400 dark:hover:border-orange-600 hover:shadow-lg hover:shadow-orange-200 dark:hover:shadow-orange-900/30 transition-all font-medium px-4 py-2"
                   >
                     {example}
                   </Button>
@@ -182,11 +182,13 @@ function App() {
                   <div key={index}>
                     {/* Show tool executions ABOVE the last assistant message */}
                     {isLastAssistantMessage && toolExecutions.length > 0 && (
-                      <div className="space-y-3 mb-4">
-                        <div className="flex items-center gap-2">
-                          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-blue-300 dark:via-blue-700 to-transparent"></div>
-                          <span className="text-xs font-semibold text-blue-700 dark:text-blue-300 tracking-wide">🔧 TOOL EXECUTIONS</span>
-                          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-blue-300 dark:via-blue-700 to-transparent"></div>
+                      <div className="space-y-3 mb-6">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="h-0.5 flex-1 bg-gradient-to-r from-transparent via-orange-300 dark:via-orange-700 to-transparent"></div>
+                          <span className="text-sm font-bold text-orange-700 dark:text-orange-300 tracking-wide px-3 py-1 bg-orange-50 dark:bg-orange-950/30 rounded-full border border-orange-200 dark:border-orange-800">
+                            🔧 TOOL EXECUTIONS
+                          </span>
+                          <div className="h-0.5 flex-1 bg-gradient-to-r from-transparent via-orange-300 dark:via-orange-700 to-transparent"></div>
                         </div>
                         {toolExecutions.map((execution) => (
                           <ToolExecutionCard
@@ -200,7 +202,7 @@ function App() {
                             endTime={execution.endTime}
                           />
                         ))}
-                        <div className="h-px bg-gradient-to-r from-transparent via-gray-200 dark:via-gray-700 to-transparent my-4"></div>
+                        <div className="h-0.5 bg-gradient-to-r from-transparent via-orange-200 dark:via-orange-800 to-transparent my-4"></div>
                       </div>
                     )}
 

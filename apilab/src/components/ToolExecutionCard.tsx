@@ -41,9 +41,9 @@ export function ToolExecutionCard({
   const getStatusIcon = () => {
     switch (status) {
       case 'pending':
-        return <Loader2 className="h-4 w-4 text-yellow-600 dark:text-yellow-400 animate-spin" />;
+        return <Loader2 className="h-4 w-4 text-amber-600 dark:text-amber-400 animate-spin" />;
       case 'running':
-        return <Loader2 className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-spin" />;
+        return <Loader2 className="h-4 w-4 text-orange-600 dark:text-orange-400 animate-spin" />;
       case 'complete':
         return <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />;
       case 'error':
@@ -54,11 +54,11 @@ export function ToolExecutionCard({
   const getStatusColor = () => {
     switch (status) {
       case 'pending':
-        return 'border-2 border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950/30';
+        return 'border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30';
       case 'running':
-        return 'border-2 border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-950/30 shadow-lg shadow-blue-500/20';
+        return 'border-2 border-orange-400 dark:border-orange-600 bg-orange-50 dark:bg-orange-950/30 shadow-xl shadow-orange-500/30';
       case 'complete':
-        return 'border-2 border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-950/30';
+        return 'border-2 border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-950/30 shadow-lg shadow-green-500/20';
       case 'error':
         return 'border-2 border-red-400 dark:border-red-600 bg-red-50 dark:bg-red-950/30';
     }
@@ -154,16 +154,16 @@ export function ToolExecutionCard({
 
           {/* Running message */}
           {status === 'running' && (
-            <div className="space-y-1">
-              <p className="text-xs text-blue-700 dark:text-blue-300 italic flex items-center gap-2">
+            <div className="space-y-2">
+              <p className="text-xs text-orange-700 dark:text-orange-300 italic flex items-center gap-2 font-medium">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 {args && Object.keys(args).length > 0 ? 'Executing API call...' : 'Preparing tool call...'}
               </p>
               {/* Show progress dots */}
-              <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              <div className="flex gap-1.5">
+                <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce shadow-sm shadow-orange-500/50" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce shadow-sm shadow-orange-500/50" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce shadow-sm shadow-orange-500/50" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           )}
