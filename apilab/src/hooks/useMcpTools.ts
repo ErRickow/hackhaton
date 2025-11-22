@@ -105,7 +105,7 @@ export function useMcpTools(): UseMcpToolsReturn {
       const apiKeys = apiKeysJson ? JSON.parse(apiKeysJson) : {};
 
       const apiKey = apiKeys.e2b;
-      const backendUrl = apiKeys.backendUrl;
+      let backendUrl = apiKeys.backendUrl;
 
       if (!apiKey) {
         throw new Error('E2B API key not found. Please configure it in Settings.');
@@ -114,6 +114,9 @@ export function useMcpTools(): UseMcpToolsReturn {
       if (!backendUrl) {
         throw new Error('Backend URL not configured. Please configure it in Settings.');
       }
+
+      // Normalize backend URL - remove trailing slash to prevent double slashes
+      backendUrl = backendUrl.replace(/\/+$/, '');
 
       // Step 1: Call backend to create E2B sandbox
       console.log('📡 Step 1: Creating E2B sandbox via backend...');
