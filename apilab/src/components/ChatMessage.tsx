@@ -67,37 +67,66 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
 
   const parsed = !isUser ? parseApiResponse(content) : null;
 
+  // Convert URLs to clickable links and add citations
+  const renderContentWithLinks = (text: string) => {
+    // URL regex pattern
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+
+    return parts.map((part, index) => {
+      if (urlRegex.test(part)) {
+        // This is a URL
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 underline font-medium"
+          >
+            {part}
+          </a>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
   return (
     <div
       className={cn(
-        'flex gap-3 p-4 rounded-lg',
-        isUser ? 'bg-primary/10' : 'bg-muted/50'
+        'flex gap-3 p-4 rounded-lg border-2',
+        isUser
+          ? 'bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800'
+          : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700'
       )}
     >
       {/* Avatar */}
       <div
         className={cn(
-          'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
-          isUser ? 'bg-primary text-primary-foreground' : 'bg-muted'
+          'flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center',
+          isUser
+            ? 'bg-orange-600 dark:bg-orange-500 text-white'
+            : 'bg-gray-600 dark:bg-gray-700 text-white'
         )}
       >
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </div>
 
       {/* Content */}
-      <div className="flex-1 space-y-3">
-        <div className="font-semibold text-sm">
-          {isUser ? 'You' : 'APILab Assistant'}
+      <div className="flex-1 space-y-2">
+        <div className="font-bold text-sm text-foreground">
+          {isUser ? 'You' : 'Assistant'}
         </div>
 
         {/* Text content */}
         {!content && isStreaming ? (
-          <ThinkingIndicator message="Thinking about which tools to call..." />
+          <ThinkingIndicator message="Thinking..." />
         ) : parsed ? (
           <>
             {parsed.remainingText && (
-              <div className="text-sm whitespace-pre-wrap break-words">
-                {parsed.remainingText}
+              <div className="text-base leading-relaxed text-foreground">
+                {renderContentWithLinks(parsed.remainingText)}
               </div>
             )}
             <ApiResponse
@@ -112,8 +141,8 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
             />
           </>
         ) : (
-          <div className="text-sm whitespace-pre-wrap break-words">
-            {content}
+          <div className="text-base leading-relaxed whitespace-pre-wrap break-words text-foreground">
+            {renderContentWithLinks(content)}
           </div>
         )}
       </div>

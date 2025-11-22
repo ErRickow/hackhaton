@@ -53,12 +53,7 @@ function App() {
       {/* Minimal Header */}
       <header className="border-b-2 border-orange-300 dark:border-orange-800 px-4 py-3 flex items-center justify-between flex-shrink-0 bg-orange-100 dark:bg-orange-950">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-orange-600 dark:bg-orange-500 flex items-center justify-center">
-              <span className="text-white font-bold text-base">AL</span>
-            </div>
-            <h1 className="text-xl font-bold text-orange-700 dark:text-orange-400">APILab</h1>
-          </div>
+          <h1 className="text-xl font-bold text-orange-700 dark:text-orange-400">APILab</h1>
 
           {/* Status Indicator (Minimal) */}
           {isStarting && (
@@ -131,9 +126,6 @@ function App() {
           {/* Welcome Message */}
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center space-y-6 py-12">
-              <div className="w-24 h-24 rounded-2xl bg-orange-600 dark:bg-orange-500 flex items-center justify-center mb-2 border-4 border-orange-300 dark:border-orange-700">
-                <span className="text-white font-bold text-4xl">AL</span>
-              </div>
               <div className="space-y-3">
                 <h2 className="text-3xl font-bold text-orange-700 dark:text-orange-400">
                   Welcome to APILab

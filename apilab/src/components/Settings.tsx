@@ -113,8 +113,8 @@ export function Settings({ isOpen, onClose, onSettingsSaved }: SettingsProps) {
   const currentProviderInfo = PROVIDERS[selectedProvider];
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div className="fixed inset-0 bg-gray-900 dark:bg-black flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto border-2 border-orange-300 dark:border-orange-700">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -133,8 +133,8 @@ export function Settings({ isOpen, onClose, onSettingsSaved }: SettingsProps) {
         <CardContent className="space-y-6">
           {/* Success Message */}
           {savedMessage && (
-            <div className="p-3 bg-green-100 dark:bg-green-900/30 border-2 border-green-500 dark:border-green-700 rounded-lg">
-              <p className="text-sm font-medium text-green-900 dark:text-green-100 flex items-center gap-2">
+            <div className="p-3 bg-green-100 dark:bg-green-900 border-2 border-green-400 dark:border-green-600 rounded-lg">
+              <p className="text-sm font-medium text-green-800 dark:text-green-200 flex items-center gap-2">
                 <Check className="h-4 w-4" />
                 {savedMessage}
               </p>
@@ -156,7 +156,7 @@ export function Settings({ isOpen, onClose, onSettingsSaved }: SettingsProps) {
                   setSelectedProvider(e.target.value as Provider);
                   setInputValue('');
                 }}
-                className="w-full px-3 py-2 border-2 rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border-2 rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-orange-500"
               >
                 <option value="backendUrl">Backend API URL (Required)</option>
                 <option value="e2b">E2B Sandbox (Required)</option>
@@ -359,8 +359,8 @@ export function Settings({ isOpen, onClose, onSettingsSaved }: SettingsProps) {
 
           {/* Warning */}
           {!isConfigured && (
-            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-lg">
-              <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+            <div className="p-4 bg-amber-100 dark:bg-amber-900 border-2 border-amber-400 dark:border-amber-600 rounded-lg">
+              <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
                 ⚠️ <strong>Required:</strong> You need at least E2B API key and one LLM provider (Neosantara or Groq) to use APILab.
               </p>
             </div>
