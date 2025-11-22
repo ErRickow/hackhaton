@@ -152,9 +152,24 @@ export default {
 
       try {
         console.log('📋 Listing MCP tools for sandbox:', sandboxId);
+        console.log('   MCP URL:', cached.mcpUrl);
+        console.log('   Has token:', !!cached.mcpToken);
 
-        // Fetch tools directly from MCP gateway using JSON-RPC over HTTP
-        // Per MCP spec: Accept MUST include both application/json and text/event-stream
+        // Use E2B SDK's MCP client methods instead of direct HTTP
+        // E2B provides mcpClient.listTools() method
+        if (cached.sandbox.mcp) {
+          console.log('Using E2B SDK MCP client methods');
+          const tools = await cached.sandbox.mcp.listTools();
+          console.log(`✅ Found ${tools.length} tools via SDK`);
+
+          return corsResponse({
+            tools,
+            count: tools.length
+          });
+        }
+
+        // Fallback: Fetch tools directly from MCP gateway using JSON-RPC over HTTP
+        console.log('Fallback: Using direct HTTP to MCP gateway');
         const mcpResponse = await fetch(cached.mcpUrl, {
           method: 'POST',
           headers: {
@@ -170,35 +185,50 @@ export default {
           })
         });
 
+        console.log('   Response status:', mcpResponse.status, mcpResponse.statusText);
+
         if (!mcpResponse.ok) {
           const errorText = await mcpResponse.text();
+          console.error('   Error response:', errorText);
           throw new Error(`MCP gateway error: ${mcpResponse.status} ${mcpResponse.statusText} - ${errorText}`);
         }
 
         const contentType = mcpResponse.headers.get('content-type') || '';
-        console.log('Response content-type:', contentType);
+        console.log('   Response content-type:', contentType);
+
+        // Get full response text for debugging
+        const responseText = await mcpResponse.text();
+        console.log('   Response body (first 500 chars):', responseText.substring(0, 500));
+
+        let mcpData;
 
         // Handle SSE response if gateway sends it
         if (contentType.includes('text/event-stream')) {
-          const text = await mcpResponse.text();
-          console.log('SSE response:', text.substring(0, 200));
+          console.log('   Parsing SSE format...');
 
           // Parse SSE format: "data: {...}\n\n"
-          const dataMatch = text.match(/data: (.*)\n/);
+          const dataMatch = responseText.match(/data: (.*?)(?:\n|$)/);
           if (dataMatch) {
-            const mcpData = JSON.parse(dataMatch[1]);
-            const tools = mcpData.result?.tools || [];
-            console.log(`✅ Found ${tools.length} tools (via SSE)`);
-            return corsResponse({ tools, count: tools.length });
+            mcpData = JSON.parse(dataMatch[1]);
+            console.log('   Parsed SSE data:', JSON.stringify(mcpData).substring(0, 200));
+          } else {
+            throw new Error('Failed to parse SSE response - no data match found');
           }
-          throw new Error('Failed to parse SSE response');
+        } else {
+          // Handle regular JSON response
+          console.log('   Parsing JSON format...');
+          mcpData = JSON.parse(responseText);
         }
 
-        // Handle regular JSON response
-        const mcpData = await mcpResponse.json();
         const tools = mcpData.result?.tools || [];
-
         console.log(`✅ Found ${tools.length} tools`);
+
+        if (tools.length > 0) {
+          console.log('   First tool:', JSON.stringify(tools[0]));
+        } else {
+          console.warn('   ⚠️ No tools found!');
+          console.warn('   MCP data structure:', JSON.stringify(mcpData));
+        }
 
         return corsResponse({
           tools,
@@ -230,10 +260,24 @@ export default {
           return corsResponse({ error: 'toolName is required' }, 400);
         }
 
-        console.log(`🔧 Calling tool: ${toolName}`, args);
+        console.log(`🔧 Calling tool: ${toolName}`, JSON.stringify(args));
 
-        // Call tool directly via MCP gateway using JSON-RPC over HTTP
-        // Per MCP spec: Accept MUST include both application/json and text/event-stream
+        // Use E2B SDK's MCP client methods instead of direct HTTP
+        if (cached.sandbox.mcp) {
+          console.log('Using E2B SDK MCP client callTool method');
+          const result = await cached.sandbox.mcp.callTool(toolName, args || {});
+          console.log('✅ Tool call successful via SDK');
+          console.log('   Result type:', typeof result);
+          console.log('   Result:', JSON.stringify(result).substring(0, 200));
+
+          return corsResponse({
+            result: result,
+            isError: false
+          });
+        }
+
+        // Fallback: Call tool directly via MCP gateway using JSON-RPC over HTTP
+        console.log('Fallback: Using direct HTTP to MCP gateway');
         const mcpResponse = await fetch(cached.mcpUrl, {
           method: 'POST',
           headers: {
@@ -252,34 +296,47 @@ export default {
           })
         });
 
+        console.log('   Response status:', mcpResponse.status, mcpResponse.statusText);
+
         if (!mcpResponse.ok) {
           const errorText = await mcpResponse.text();
+          console.error('   Error response:', errorText);
           throw new Error(`MCP gateway error: ${mcpResponse.status} ${mcpResponse.statusText} - ${errorText}`);
         }
 
         const contentType = mcpResponse.headers.get('content-type') || '';
-        console.log('Response content-type:', contentType);
+        console.log('   Response content-type:', contentType);
+
+        // Get full response text for debugging
+        const responseText = await mcpResponse.text();
+        console.log('   Response body (first 500 chars):', responseText.substring(0, 500));
 
         let mcpData;
         // Handle SSE response if gateway sends it
         if (contentType.includes('text/event-stream')) {
-          const text = await mcpResponse.text();
-          console.log('SSE response:', text.substring(0, 200));
+          console.log('   Parsing SSE format...');
 
           // Parse SSE format: "data: {...}\n\n"
-          const dataMatch = text.match(/data: (.*)\n/);
+          const dataMatch = responseText.match(/data: (.*?)(?:\n|$)/);
           if (dataMatch) {
             mcpData = JSON.parse(dataMatch[1]);
+            console.log('   Parsed SSE data:', JSON.stringify(mcpData).substring(0, 200));
           } else {
-            throw new Error('Failed to parse SSE response');
+            throw new Error('Failed to parse SSE response - no data match found');
           }
         } else {
           // Handle regular JSON response
-          mcpData = await mcpResponse.json();
+          console.log('   Parsing JSON format...');
+          mcpData = JSON.parse(responseText);
         }
 
         const result = mcpData.result;
         console.log('✅ Tool call successful');
+        console.log('   Result structure:', {
+          hasContent: 'content' in (result || {}),
+          hasIsError: 'isError' in (result || {}),
+          resultType: typeof result
+        });
 
         return corsResponse({
           result: result?.content || result,
@@ -288,9 +345,9 @@ export default {
       } catch (error: any) {
         console.error('❌ Failed to call tool:', error);
         return corsResponse({
-          error: error.message || 'Failed to call MCP tool',
-          details: error.stack
-        }, 500);
+          result: { error: error.message },
+          isError: true
+        }, 200); // Return 200 with isError flag instead of 500
       }
     }
 
