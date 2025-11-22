@@ -11,11 +11,11 @@ interface ThinkingIndicatorProps {
 
 export function ThinkingIndicator({ message = 'Thinking...' }: ThinkingIndicatorProps) {
   return (
-    <Card className="p-3 bg-orange-50 dark:bg-orange-950 border-2 border-orange-200 dark:border-orange-800">
+    <Card className="p-3 bg-muted/50">
       <div className="flex items-center gap-3">
         <span className="text-xl animate-pulse">⭐</span>
         <div className="flex-1">
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          <p className="text-sm font-medium text-muted-foreground">
             {message}
           </p>
         </div>

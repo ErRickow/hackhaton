@@ -101,20 +101,20 @@ export function ToolExecutionCard({
       >
         <div className="flex items-center gap-2 flex-1">
           {getStatusIcon()}
-          <Zap className="h-3 w-3 text-gray-600 dark:text-gray-400" />
-          <span className="text-sm font-mono font-medium text-gray-900 dark:text-gray-100">{toolName}</span>
+          <Zap className="h-3 w-3 text-muted-foreground" />
+          <span className="text-sm font-mono font-medium text-foreground">{toolName}</span>
           <Badge variant="outline" className="text-xs">
             {getStatusText()}
           </Badge>
           {getDuration() && (
-            <span className="text-xs text-gray-700 dark:text-gray-300">{getDuration()}</span>
+            <span className="text-xs text-muted-foreground">{getDuration()}</span>
           )}
         </div>
         <div>
           {isExpanded ? (
-            <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
           ) : (
-            <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
           )}
         </div>
       </div>
@@ -125,9 +125,9 @@ export function ToolExecutionCard({
           {/* Arguments */}
           {args && Object.keys(args).length > 0 && (
             <div>
-              <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Arguments:</p>
-              <div className="bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded p-2">
-                <pre className="text-xs font-mono text-gray-900 dark:text-gray-100 overflow-x-auto">{formatJson(args)}</pre>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Arguments:</p>
+              <div className="bg-muted/30 border rounded p-2">
+                <pre className="text-xs font-mono text-foreground overflow-x-auto">{formatJson(args)}</pre>
               </div>
             </div>
           )}
@@ -135,9 +135,9 @@ export function ToolExecutionCard({
           {/* Result */}
           {result && status === 'complete' && (
             <div>
-              <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Result:</p>
-              <div className="bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded p-2 max-h-48 overflow-y-auto">
-                <pre className="text-xs font-mono text-gray-900 dark:text-gray-100 overflow-x-auto">{formatJson(result)}</pre>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Result:</p>
+              <div className="bg-muted/30 border rounded p-2 max-h-48 overflow-y-auto">
+                <pre className="text-xs font-mono text-foreground overflow-x-auto">{formatJson(result)}</pre>
               </div>
             </div>
           )}
@@ -145,18 +145,18 @@ export function ToolExecutionCard({
           {/* Error */}
           {error && status === 'error' && (
             <div>
-              <p className="text-xs font-medium text-red-700 dark:text-red-300 mb-1">Error:</p>
-              <div className="bg-red-50 dark:bg-red-950 border border-red-300 dark:border-red-700 rounded p-2">
-                <p className="text-xs text-red-800 dark:text-red-200">{error}</p>
+              <p className="text-xs font-medium text-destructive mb-1">Error:</p>
+              <div className="bg-destructive/10 border border-destructive/20 rounded p-2">
+                <p className="text-xs text-destructive">{error}</p>
               </div>
             </div>
           )}
 
           {/* Running message */}
           {status === 'running' && (
-            <p className="text-xs text-orange-800 dark:text-orange-200 italic flex items-center gap-2 font-medium">
+            <p className="text-xs text-muted-foreground italic flex items-center gap-2 font-medium">
               <span className="text-base animate-pulse">⭐</span>
-              {args && Object.keys(args).length > 0 ? 'Executing API call...' : 'Preparing tool call...'}
+              {args && Object.keys(args).length > 0 ? 'Executing...' : 'Preparing...'}
             </p>
           )}
         </div>

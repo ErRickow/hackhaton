@@ -51,21 +51,21 @@ function App() {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Minimal Header */}
-      <header className="border-b-2 border-orange-300 dark:border-orange-800 px-4 py-3 flex items-center justify-between flex-shrink-0 bg-orange-100 dark:bg-orange-950">
+      <header className="border-b px-4 py-3 flex items-center justify-between flex-shrink-0 bg-card">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold text-orange-700 dark:text-orange-400">APILab</h1>
+          <h1 className="text-xl font-bold text-primary">APILab</h1>
 
           {/* Status Indicator (Minimal) */}
           {isStarting && (
-            <div className="flex items-center gap-1.5 text-xs text-orange-700 dark:text-orange-300 font-medium">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
               <Loader2 className="h-3 w-3 animate-spin" />
-              <span>Starting MCP...</span>
+              <span>Starting...</span>
             </div>
           )}
           {isReady && (
-            <div className="flex items-center gap-1.5 bg-green-200 dark:bg-green-900 px-2.5 py-1 rounded-md border-2 border-green-400 dark:border-green-700">
+            <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-950 px-2.5 py-1 rounded-md border border-green-200 dark:border-green-800">
               <div className="h-2 w-2 rounded-full bg-green-600 dark:bg-green-400 animate-pulse" />
-              <span className="text-xs text-green-800 dark:text-green-200 font-semibold">Ready</span>
+              <span className="text-xs text-green-800 dark:text-green-200 font-medium">Ready</span>
             </div>
           )}
         </div>
@@ -74,9 +74,9 @@ function App() {
           variant="ghost"
           size="icon"
           onClick={() => setShowSettings(true)}
-          className="h-9 w-9 hover:bg-orange-200 dark:hover:bg-orange-900"
+          className="h-9 w-9"
         >
-          <SettingsIcon className="h-4 w-4 text-orange-700 dark:text-orange-300" />
+          <SettingsIcon className="h-4 w-4" />
         </Button>
       </header>
 
@@ -127,11 +127,11 @@ function App() {
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center space-y-6 py-12">
               <div className="space-y-3">
-                <h2 className="text-3xl font-bold text-orange-700 dark:text-orange-400">
+                <h2 className="text-3xl font-bold text-primary">
                   Welcome to APILab
                 </h2>
                 <p className="text-base text-muted-foreground max-w-lg leading-relaxed px-4">
-                  AI Assistant with access to <span className="font-bold text-orange-700 dark:text-orange-400">real-time tools</span>
+                  AI Assistant with access to <span className="font-bold text-foreground">real-time tools</span>
                   <br />
                   <span className="text-sm">Powered by E2B MCP Servers • Neosantara AI</span>
                 </p>
@@ -155,7 +155,6 @@ function App() {
                       } as any)
                       setTimeout(() => handleSubmit(event), 100)
                     }}
-                    className="text-sm border-2 border-orange-300 dark:border-orange-700 hover:bg-orange-100 dark:hover:bg-orange-900 hover:border-orange-500 dark:hover:border-orange-500 transition-colors font-medium px-4 py-2"
                   >
                     {example}
                   </Button>
@@ -176,11 +175,11 @@ function App() {
                     {isLastAssistantMessage && toolExecutions.length > 0 && (
                       <div className="space-y-3 mb-6">
                         <div className="flex items-center gap-3 mb-3">
-                          <div className="h-1 flex-1 bg-orange-300 dark:bg-orange-700"></div>
-                          <span className="text-sm font-bold text-orange-800 dark:text-orange-200 tracking-wide px-3 py-1 bg-orange-100 dark:bg-orange-900 rounded-md border-2 border-orange-300 dark:border-orange-700">
-                            🔧 TOOL EXECUTIONS
+                          <div className="h-px flex-1 bg-border"></div>
+                          <span className="text-xs font-medium text-muted-foreground tracking-wide px-3 py-1 bg-muted rounded-md">
+                            🔧 Tool Executions
                           </span>
-                          <div className="h-1 flex-1 bg-orange-300 dark:bg-orange-700"></div>
+                          <div className="h-px flex-1 bg-border"></div>
                         </div>
                         {toolExecutions.map((execution) => (
                           <ToolExecutionCard
@@ -194,7 +193,7 @@ function App() {
                             endTime={execution.endTime}
                           />
                         ))}
-                        <div className="h-1 bg-orange-300 dark:bg-orange-700 my-4"></div>
+                        <div className="h-px bg-border my-4"></div>
                       </div>
                     )}
 

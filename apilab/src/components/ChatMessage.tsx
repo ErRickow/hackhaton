@@ -82,7 +82,7 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
             href={part}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 underline font-medium"
+            className="text-primary hover:underline font-medium"
           >
             {part}
           </a>
@@ -95,10 +95,10 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
   return (
     <div
       className={cn(
-        'flex gap-3 p-4 rounded-lg border-2',
+        'flex gap-3 p-4 rounded-lg border',
         isUser
-          ? 'bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800'
-          : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+          ? 'bg-primary/5 border-primary/20'
+          : 'bg-card border-border'
       )}
     >
       {/* Avatar */}
@@ -106,8 +106,8 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
         className={cn(
           'flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center',
           isUser
-            ? 'bg-orange-600 dark:bg-orange-500 text-white'
-            : 'bg-gray-700 dark:bg-gray-600 text-white'
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-muted text-muted-foreground'
         )}
       >
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
@@ -115,7 +115,7 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
 
       {/* Content */}
       <div className="flex-1 space-y-2">
-        <div className="font-bold text-sm text-gray-900 dark:text-gray-100">
+        <div className="font-bold text-sm text-foreground">
           {isUser ? 'You' : 'Assistant'}
         </div>
 
@@ -125,7 +125,7 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
         ) : parsed ? (
           <>
             {parsed.remainingText && (
-              <div className="text-base leading-relaxed text-gray-900 dark:text-gray-100">
+              <div className="text-base leading-relaxed text-foreground">
                 {renderContentWithLinks(parsed.remainingText)}
               </div>
             )}
@@ -141,7 +141,7 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
             />
           </>
         ) : (
-          <div className="text-base leading-relaxed whitespace-pre-wrap break-words text-gray-900 dark:text-gray-100">
+          <div className="text-base leading-relaxed whitespace-pre-wrap break-words text-foreground">
             {renderContentWithLinks(content)}
           </div>
         )}
