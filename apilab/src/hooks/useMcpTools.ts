@@ -3,7 +3,7 @@
  * Manages E2B MCP connection via BACKEND PROXY (no direct E2B connection)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { UseMcpToolsReturn } from '@/types';
 import { z } from 'zod';
 import { tool } from 'ai';
@@ -26,7 +26,8 @@ const testTool = tool({
 });
 
 export function useMcpTools(): UseMcpToolsReturn {
-  const [mcpServer, setMcpServer] = useState<any>(null);
+  // Use ref for mcpServer to avoid closure issues with tool execute functions
+  const mcpServerRef = useRef<any>(null);
   const [tools, setTools] = useState<any>({}); // Store AI SDK tools format
   const [isStarting, setIsStarting] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -312,7 +313,8 @@ export function useMcpTools(): UseMcpToolsReturn {
       console.log('🎯 Added hardcoded test_tool for debugging');
 
       // Store everything (no MCP client - backend handles it)
-      setMcpServer({ sandboxId, backendUrl });
+      // Use ref instead of state to avoid closure issues
+      mcpServerRef.current = { sandboxId, backendUrl };
       setTools(aiSdkTools);
       setIsReady(true);
       setIsStarting(false);
@@ -347,6 +349,9 @@ export function useMcpTools(): UseMcpToolsReturn {
    * Call MCP tool via backend proxy
    */
   const callTool = async (toolName: string, args: Record<string, any>) => {
+    // Use ref to get current value (avoids closure issues)
+    const mcpServer = mcpServerRef.current;
+
     if (!mcpServer || !mcpServer.sandboxId) {
       throw new Error('MCP server not initialized');
     }
@@ -415,7 +420,7 @@ export function useMcpTools(): UseMcpToolsReturn {
     setIsStarting(false);
     setError(null);
     setTools({});
-    setMcpServer(null);
+    mcpServerRef.current = null;
 
     // Wait a bit before restarting
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -437,7 +442,7 @@ export function useMcpTools(): UseMcpToolsReturn {
     error,
     startHttpClient,
     restartConnection,
-    mcpServer,
+    mcpServer: mcpServerRef.current,
     callTool,
   };
 }
