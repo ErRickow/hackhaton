@@ -70,8 +70,25 @@ export function useMcpTools(): UseMcpToolsReturn {
                 if (response.isError) {
                   throw new Error(JSON.stringify(response.result));
                 }
-                // Return unwrapped result
-                return response.result;
+
+                // MCP tools return data in format: { content: [{ type: "text", text: "..." }] }
+                // AI SDK expects plain string/object, so we need to convert
+                const result = response.result;
+
+                // Convert MCP content format to plain text for AI SDK
+                if (result && typeof result === 'object' && 'content' in result && Array.isArray(result.content)) {
+                  // Extract text from MCP content array
+                  const textContent = result.content
+                    .filter((item: any) => item.type === 'text')
+                    .map((item: any) => item.text)
+                    .join('\n');
+
+                  console.log(`📄 Converted MCP content to text (${textContent.length} chars)`);
+                  return textContent;
+                }
+
+                // Return unwrapped result if not in MCP content format
+                return result;
               }
 
               // Fallback: return as-is if not wrapped
