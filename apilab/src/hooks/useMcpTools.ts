@@ -356,9 +356,10 @@ export function useMcpTools(): UseMcpToolsReturn {
       throw new Error('MCP server not initialized');
     }
 
-    if (!tools || Object.keys(tools).length === 0) {
-      throw new Error('MCP tools not initialized');
-    }
+    // Note: We don't check tools state here because:
+    // 1. If this function is called, the tool already exists (it's in the tools object)
+    // 2. We only need mcpServer to make the backend API call
+    // 3. Checking tools state causes closure issues since tools are set after callTool is defined
 
     try {
       console.log(`🔧 Calling MCP tool via backend: ${toolName}`, args);
