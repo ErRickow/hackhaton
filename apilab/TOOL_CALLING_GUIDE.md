@@ -1,29 +1,30 @@
 # OpenAI SDK Tool Calling Guide - APILab
 
-Panduan lengkap penggunaan OpenAI SDK (via Vercel AI SDK) untuk tool calling dalam APILab.
+Complete guide for using OpenAI SDK (via Vercel AI SDK) for tool calling in APILab.
 
 ## 📚 Table of Contents
 
-1. [Konsep Dasar](#konsep-dasar)
+1. [Basic Concepts](#basic-concepts)
 2. [Setup & Dependencies](#setup--dependencies)
-3. [Implementasi Tool Calling](#implementasi-tool-calling)
-4. [Pattern yang Digunakan](#pattern-yang-digunakan)
+3. [Tool Calling Implementation](#tool-calling-implementation)
+4. [Common Patterns](#common-patterns)
 5. [Error Handling](#error-handling)
 6. [Best Practices](#best-practices)
+7. [Live Demo](#live-demo)
 
 ---
 
-## Konsep Dasar
+## Basic Concepts
 
-### Apa itu Tool Calling?
+### What is Tool Calling?
 
-Tool calling adalah kemampuan LLM untuk memanggil fungsi/tools eksternal berdasarkan user request. Flow-nya:
+Tool calling enables LLMs to invoke external functions/tools based on user requests. The flow:
 
 ```
 User → LLM → Tool Decision → Tool Execution → LLM → Response
 ```
 
-### Architecture APILab
+### APILab Architecture
 
 ```
 ┌─────────────┐
@@ -46,8 +47,13 @@ User → LLM → Tool Decision → Tool Execution → LLM → Response
 └──────┬───────────┘
        │
        v
+┌──────────────────────┐
+│ e2b-mcp-api Worker  │  ← Cloudflare Worker (MCP Gateway)
+└──────┬───────────────┘
+       │
+       v
 ┌──────────────────┐
-│   MCP Server     │  ← E2B Sandbox
+│   E2B Sandbox    │  ← MCP Server Runtime
 └──────────────────┘
 ```
 
@@ -824,12 +830,450 @@ if (response.status === 404) {
 
 ---
 
+## Live Demo
+
+### Complete Working Example with Cloudflare Worker
+
+This demo shows how to use OpenAI SDK with tools deployed on Cloudflare Worker (e2b-mcp-api).
+
+#### 1. Cloudflare Worker Setup (e2b-mcp-api)
+
+**File: `worker.mjs`**
+
+```javascript
+// Cloudflare Worker - MCP Gateway API
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+
+    // CORS headers
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    };
+
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders });
+    }
+
+    // Initialize MCP session
+    if (url.pathname === '/api/mcp/init') {
+      const { E2B_API_KEY } = env;
+
+      // Create E2B sandbox with MCP server
+      const sandbox = await fetch('https://api.e2b.dev/sandboxes', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${E2B_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          template: 'mcp-server', // Custom template with MCP tools
+        }),
+      });
+
+      const { sandboxId } = await sandbox.json();
+
+      return Response.json(
+        { sandboxId, session: `mcp-${Date.now()}` },
+        { headers: corsHeaders }
+      );
+    }
+
+    // List available tools
+    if (url.pathname.startsWith('/api/mcp/tools/')) {
+      const sandboxId = url.pathname.split('/')[4];
+
+      // Call MCP server's tools/list
+      const tools = await fetch(
+        `https://api.e2b.dev/sandboxes/${sandboxId}/mcp/tools/list`,
+        {
+          headers: { 'Authorization': `Bearer ${env.E2B_API_KEY}` },
+        }
+      );
+
+      return new Response(tools.body, { headers: corsHeaders });
+    }
+
+    // Call tool
+    if (url.pathname.startsWith('/api/mcp/call/')) {
+      const sandboxId = url.pathname.split('/')[4];
+      const { toolName, args } = await request.json();
+
+      // Execute tool via MCP server
+      const result = await fetch(
+        `https://api.e2b.dev/sandboxes/${sandboxId}/mcp/tools/call`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${env.E2B_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name: toolName, arguments: args }),
+        }
+      );
+
+      return new Response(result.body, { headers: corsHeaders });
+    }
+
+    return new Response('Not Found', { status: 404, headers: corsHeaders });
+  },
+};
+```
+
+**Deploy to Cloudflare:**
+
+```bash
+# Deploy worker
+npx wrangler deploy worker.mjs
+
+# Add secrets
+npx wrangler secret put E2B_API_KEY
+```
+
+#### 2. Frontend Integration with OpenAI SDK
+
+**File: `src/hooks/useMcpTools.ts`**
+
+```typescript
+import { useState, useEffect, useRef } from 'react';
+import { z } from 'zod';
+
+export function useMcpTools() {
+  const [isReady, setIsReady] = useState(false);
+  const [tools, setTools] = useState<Record<string, any>>({});
+  const [error, setError] = useState<Error | null>(null);
+
+  const backendUrl = 'https://your-worker.workers.dev'; // Your Cloudflare Worker
+  const sandboxIdRef = useRef<string | null>(null);
+
+  // Initialize MCP session
+  useEffect(() => {
+    async function init() {
+      try {
+        // 1. Initialize MCP session
+        const initRes = await fetch(`${backendUrl}/api/mcp/init`, {
+          method: 'POST',
+        });
+        const { sandboxId } = await initRes.json();
+        sandboxIdRef.current = sandboxId;
+
+        // 2. Fetch available tools
+        const toolsRes = await fetch(`${backendUrl}/api/mcp/tools/${sandboxId}`);
+        const { tools: mcpTools } = await toolsRes.json();
+
+        // 3. Convert to AI SDK format
+        const aiSdkTools: Record<string, any> = {};
+
+        for (const tool of mcpTools) {
+          aiSdkTools[tool.name] = {
+            description: tool.description,
+            parameters: convertJsonSchemaToZod(tool.inputSchema),
+            execute: async (args: Record<string, any>) => {
+              // Call tool via worker
+              const res = await fetch(`${backendUrl}/api/mcp/call/${sandboxId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ toolName: tool.name, args }),
+              });
+
+              return await res.json();
+            },
+          };
+        }
+
+        setTools(aiSdkTools);
+        setIsReady(true);
+        console.log('✓ MCP Tools Ready:', Object.keys(aiSdkTools));
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error(String(err)));
+      }
+    }
+
+    init();
+  }, []);
+
+  return { isReady, tools, error };
+}
+
+function convertJsonSchemaToZod(schema: any) {
+  const zodSchema: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(schema.properties || {})) {
+    let zodType: any;
+
+    switch (value.type) {
+      case 'string':
+        zodType = z.string();
+        break;
+      case 'number':
+      case 'integer':
+        zodType = z.coerce.number(); // Auto-convert "10" → 10
+        break;
+      case 'boolean':
+        zodType = z.coerce.boolean();
+        break;
+      case 'array':
+        zodType = z.array(z.any());
+        break;
+      default:
+        zodType = z.any();
+    }
+
+    if (value.description) {
+      zodType = zodType.describe(value.description);
+    }
+
+    if (!schema.required?.includes(key)) {
+      zodType = zodType.optional();
+    }
+
+    zodSchema[key] = zodType;
+  }
+
+  return z.object(zodSchema);
+}
+```
+
+**File: `src/lib/groq-client.ts`**
+
+```typescript
+import { createOpenAI } from '@ai-sdk/openai';
+import { streamText } from 'ai';
+
+export async function streamChatCompletion(
+  messages: Array<{ role: string; content: string }>,
+  tools: any,
+  onChunk: (text: string) => void,
+  onComplete: () => void,
+  onError: (error: Error) => void,
+  onToolCall?: (id: string, name: string, args: any) => void
+) {
+  // Create Neosantara AI client
+  const neosantara = createOpenAI({
+    apiKey: 'nsk_your_key_here',
+    baseURL: 'https://api.neosantara.xyz/v1',
+  });
+
+  const result = streamText({
+    model: neosantara('neosantara/Meta-Llama-3.1-70B-Instruct-Turbo'),
+    system: 'You are a helpful AI assistant with access to real-time tools.',
+    messages: messages.map(m => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    })),
+    tools, // MCP tools from worker
+    maxSteps: 10, // Allow multi-step tool use
+  });
+
+  try {
+    for await (const chunk of result.fullStream) {
+      switch (chunk.type) {
+        case 'text-delta':
+          onChunk(chunk.textDelta);
+          break;
+
+        case 'tool-call':
+          console.log(`🔧 Tool: ${chunk.toolName}`, chunk.args);
+          onToolCall?.(chunk.toolCallId, chunk.toolName, chunk.args);
+          break;
+
+        case 'finish':
+          onComplete();
+          break;
+
+        case 'error':
+          onError(new Error(chunk.error));
+          break;
+      }
+    }
+  } catch (error) {
+    onError(error instanceof Error ? error : new Error(String(error)));
+  }
+}
+```
+
+#### 3. React Component Usage
+
+**File: `src/App.tsx`**
+
+```typescript
+import { useState } from 'react';
+import { useMcpTools } from './hooks/useMcpTools';
+import { streamChatCompletion } from './lib/groq-client';
+
+export function App() {
+  const { isReady, tools } = useMcpTools();
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!input.trim() || !isReady) return;
+
+    const userMessage = { role: 'user', content: input };
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
+    setInput('');
+    setIsLoading(true);
+
+    let assistantMessage = '';
+
+    await streamChatCompletion(
+      newMessages,
+      tools,
+
+      // On text chunk
+      (chunk) => {
+        assistantMessage += chunk;
+        setMessages([...newMessages, { role: 'assistant', content: assistantMessage }]);
+      },
+
+      // On complete
+      () => setIsLoading(false),
+
+      // On error
+      (error) => {
+        console.error(error);
+        setIsLoading(false);
+      },
+
+      // On tool call
+      (id, name, args) => {
+        console.log(`Tool called: ${name}`, args);
+      }
+    );
+  };
+
+  return (
+    <div>
+      <h1>APILab - AI with MCP Tools</h1>
+
+      <div>
+        {messages.map((msg, i) => (
+          <div key={i} className={msg.role}>
+            {msg.content}
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={isReady ? "Ask anything..." : "Loading tools..."}
+          disabled={isLoading || !isReady}
+        />
+        <button type="submit" disabled={isLoading || !isReady}>
+          Send
+        </button>
+      </form>
+    </div>
+  );
+}
+```
+
+#### 4. Example: Using Tavily Search Tool
+
+**User Input:**
+```
+"Search for the latest AI research papers"
+```
+
+**LLM Decision:**
+```json
+{
+  "tool": "tavily_search",
+  "arguments": {
+    "query": "latest AI research papers 2024",
+    "max_results": 5
+  }
+}
+```
+
+**Tool Execution (via Worker):**
+```javascript
+// Worker calls E2B sandbox
+POST https://api.e2b.dev/sandboxes/{sandboxId}/mcp/tools/call
+{
+  "name": "tavily_search",
+  "arguments": {
+    "query": "latest AI research papers 2024",
+    "max_results": 5
+  }
+}
+```
+
+**Tool Response:**
+```json
+{
+  "results": [
+    {
+      "title": "GPT-5: Next Generation Language Models",
+      "url": "https://arxiv.org/...",
+      "snippet": "..."
+    },
+    // ... more results
+  ]
+}
+```
+
+**LLM Final Response:**
+```
+Based on my search, here are the latest AI research papers from 2024:
+
+1. **GPT-5: Next Generation Language Models**
+   - Link: https://arxiv.org/...
+   - This paper explores...
+
+2. ...
+```
+
+#### 5. Testing the Integration
+
+```bash
+# 1. Deploy Cloudflare Worker
+cd worker
+npx wrangler deploy
+
+# 2. Update frontend config
+# Set backendUrl in useMcpTools.ts to your worker URL
+
+# 3. Run frontend
+cd ../apilab
+npm run dev
+
+# 4. Test in browser
+# Open http://localhost:5173
+# Try: "Search for machine learning papers"
+```
+
+#### 6. Monitoring Tool Calls
+
+**Browser Console Output:**
+```
+🤖 LLM Provider: neosantara
+📝 Model: Meta-Llama-3.1-70B-Instruct-Turbo
+🔧 Tools: tavily_search, arxiv_search, weather
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔧 Tool: tavily_search
+📊 Args: { query: "machine learning papers", max_results: 5 }
+✓ MCP tool result: { results: [...] }
+✓ Stream finished
+```
+
+---
+
 ## Resources
 
 - **Vercel AI SDK Docs**: https://sdk.vercel.ai/docs
 - **OpenAI Function Calling**: https://platform.openai.com/docs/guides/function-calling
 - **Zod Documentation**: https://zod.dev
 - **MCP Protocol**: https://modelcontextprotocol.io
+- **Cloudflare Workers**: https://developers.cloudflare.com/workers
+- **E2B Sandboxes**: https://e2b.dev/docs
 
 ---
 
@@ -837,19 +1281,29 @@ if (response.status === 404) {
 
 **Key Takeaways:**
 
-1. Use **Vercel AI SDK** dengan OpenAI-compatible providers
-2. Define tools dengan **Zod schemas** + **type coercion**
-3. Stream dengan `fullStream` dan handle all event types
-4. Implement proper **error handling** dengan context untuk LLM
-5. Allow **multi-step reasoning** dengan `maxSteps`
-6. Track tool execution state untuk UI updates
+1. Use **Vercel AI SDK** with OpenAI-compatible providers
+2. Define tools with **Zod schemas** + **type coercion**
+3. Stream with `fullStream` and handle all event types
+4. Implement proper **error handling** with context for LLM
+5. Allow **multi-step reasoning** with `maxSteps`
+6. Track tool execution state for UI updates
+7. Deploy tools on **Cloudflare Worker** for production use
+
+**Architecture Benefits:**
+
+- **Serverless**: No server management, auto-scaling
+- **Fast**: Edge computing with global CDN
+- **Secure**: Secrets stored in Cloudflare
+- **Cost-effective**: Pay only for requests
+- **MCP Standard**: Compatible with any MCP server
 
 **Next Steps:**
 
-- Add more MCP tools (filesystem, database, etc.)
-- Implement tool result caching
-- Add streaming progress indicators
+- Add more MCP tools (filesystem, database, code execution)
+- Implement tool result caching for performance
+- Add streaming progress indicators in UI
 - Optimize for mobile responsiveness
+- Set up monitoring and analytics
 
 ---
 
