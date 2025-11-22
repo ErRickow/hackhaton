@@ -98,7 +98,7 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
         'flex gap-3 p-4 rounded-lg border-2',
         isUser
           ? 'bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800'
-          : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+          : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
       )}
     >
       {/* Avatar */}
@@ -107,7 +107,7 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
           'flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center',
           isUser
             ? 'bg-orange-600 dark:bg-orange-500 text-white'
-            : 'bg-gray-600 dark:bg-gray-700 text-white'
+            : 'bg-gray-700 dark:bg-gray-600 text-white'
         )}
       >
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
@@ -115,7 +115,7 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
 
       {/* Content */}
       <div className="flex-1 space-y-2">
-        <div className="font-bold text-sm text-foreground">
+        <div className="font-bold text-sm text-gray-900 dark:text-gray-100">
           {isUser ? 'You' : 'Assistant'}
         </div>
 
@@ -125,7 +125,7 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
         ) : parsed ? (
           <>
             {parsed.remainingText && (
-              <div className="text-base leading-relaxed text-foreground">
+              <div className="text-base leading-relaxed text-gray-900 dark:text-gray-100">
                 {renderContentWithLinks(parsed.remainingText)}
               </div>
             )}
@@ -141,7 +141,7 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
             />
           </>
         ) : (
-          <div className="text-base leading-relaxed whitespace-pre-wrap break-words text-foreground">
+          <div className="text-base leading-relaxed whitespace-pre-wrap break-words text-gray-900 dark:text-gray-100">
             {renderContentWithLinks(content)}
           </div>
         )}
